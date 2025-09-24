@@ -2,7 +2,7 @@
 #include "hardware/timer.h"
 #include "pico/multicore.h"
 #include <cstdio>
-//DELETE THIS.
+
 volatile uint64_t us_counter = 0;
 volatile uint32_t clock_interval_us = 5000; //50000us adds .01 presicion
 volatile uint64_t last_tick = 0;
