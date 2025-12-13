@@ -23,7 +23,8 @@ add_executable(${CMAKE_PROJECT_NAME}
 
 target_link_libraries(${CMAKE_PROJECT_NAME} 
     pico_stdlib
-    pico_multicore)
+    pico_multicore
+    hardware_timer)
 
 
 pico_enable_stdio_usb(${CMAKE_PROJECT_NAME} 1)
@@ -32,6 +33,9 @@ pico_enable_stdio_uart(${CMAKE_PROJECT_NAME} 0)
 pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
 
 set(OUTPUT_UF2 "${CMAKE_PROJECT_NAME}.uf2")
+
+# Help VS Code C/C++ extension find include paths
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 
 install(
