@@ -19,6 +19,9 @@ find_program(PICOTOOL_EXECUTABLE picotool PATHS /usr/bin)
 
 add_executable(${CMAKE_PROJECT_NAME}
     main.cpp
+    clock.cpp
+    io.cpp
+    sequencer.cpp
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} 
