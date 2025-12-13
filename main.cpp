@@ -18,11 +18,13 @@ int main() {
 
     // Core0: sequencer loop consumes tick_flag and advances state
     while (true) {
+        io_update_led();  // non-blocking LED update
+
         if (io_poll_play_toggle()) {
             bool is_playing = seq_toggle_play();
             printf("Play state: %s\n", is_playing ? "ON" : "OFF");
             if (is_playing) {
-                io_blink_led();  // blink immediately when starting
+                io_blink_led_start();  // blink immediately when starting
                 printf("LED blink at step: 0\n");
             }
         }
@@ -37,7 +39,7 @@ int main() {
 
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {
-                io_blink_led();
+                io_blink_led_start();
                 printf("LED blink at step: %u\n", (unsigned)seq_current_step());
             }
 

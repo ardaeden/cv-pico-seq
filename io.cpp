@@ -6,11 +6,15 @@
 
 namespace {
 constexpr uint BUTTON_PIN = 2;            // GP2
-constexpr uint64_t DEBOUNCE_US = 50'000;  // 50 ms debounce window
+constexpr uint64_t DEBOUNCE_US = 20'000;  // 50 ms debounce window
 constexpr uint LED_PIN = 3;               // GP3
+constexpr uint64_t LED_BLINK_DURATION_US = 50'000;  // 50 ms LED on time
 
 bool button_prev = true;               // starts high because of pull-up
 uint64_t last_button_event_us = 0;     // last time we toggled play state
+
+bool led_blinking = false;             // LED blink state
+uint64_t led_blink_start_us = 0;       // LED blink start timestamp
 }
 
 void io_init() {
@@ -35,8 +39,18 @@ bool io_poll_play_toggle() {
     return false;
 }
 
-void io_blink_led() {
+void io_blink_led_start() {
     gpio_put(LED_PIN, true);
-    sleep_ms(50);  // short blink
-    gpio_put(LED_PIN, false);
+    led_blinking = true;
+    led_blink_start_us = time_us_64();
+}
+
+void io_update_led() {
+    if (led_blinking) {
+        uint64_t now_us = time_us_64();
+        if ((now_us - led_blink_start_us) >= LED_BLINK_DURATION_US) {
+            gpio_put(LED_PIN, false);
+            led_blinking = false;
+        }
+    }
 }
