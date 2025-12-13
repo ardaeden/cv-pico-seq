@@ -15,7 +15,7 @@ uint64_t last_button_event_us = 0;     // last time we toggled play state
 
 bool led_blinking = false;             // LED blink state
 uint64_t led_blink_start_us = 0;       // LED blink start timestamp
-}
+} // namespace
 
 void io_init() {
     gpio_init(BUTTON_PIN);
