@@ -9,6 +9,7 @@ volatile uint64_t us_counter = 0;            // accumulates microseconds
 volatile uint32_t clock_interval_us = 5000;  // target interval in microseconds
 volatile uint64_t last_tick = 0;
 volatile bool tick_flag = false;             // set by core1, consumed by core0
+volatile uint32_t ppqn = 4;                  // pulses per quarter note
 
 struct repeating_timer timer_state;
 
@@ -33,8 +34,16 @@ void core1_main() {
 } // namespace
 
 void clock_set_bpm(uint32_t bpm) {
-    uint64_t us_per_beat = 60000000ULL / (bpm ? bpm : 120);
-    clock_interval_us = static_cast<uint32_t>(us_per_beat);
+    // BPM = quarter notes per minute
+    // PPQN = pulses per quarter note
+    // microseconds per pulse = (60e6 / BPM) / PPQN
+    uint64_t us_per_quarter = 60000000ULL / (bpm ? bpm : 120);
+    clock_interval_us = static_cast<uint32_t>(us_per_quarter / ppqn);
+}
+
+void clock_set_ppqn(uint32_t new_ppqn) {
+    ppqn = new_ppqn ? new_ppqn : 4;
+    // Recalculate interval if needed, but since bpm might change, better to call set_bpm after
 }
 
 void clock_launch_core1() {

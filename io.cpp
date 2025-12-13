@@ -2,10 +2,12 @@
 
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
+#include "pico/time.h"
 
 namespace {
 constexpr uint BUTTON_PIN = 2;            // GP2
 constexpr uint64_t DEBOUNCE_US = 50'000;  // 50 ms debounce window
+constexpr uint LED_PIN = 3;               // GP3
 
 bool button_prev = true;               // starts high because of pull-up
 uint64_t last_button_event_us = 0;     // last time we toggled play state
@@ -15,6 +17,9 @@ void io_init() {
     gpio_init(BUTTON_PIN);
     gpio_set_dir(BUTTON_PIN, GPIO_IN);
     gpio_pull_up(BUTTON_PIN);
+
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
 }
 
 bool io_poll_play_toggle() {
@@ -28,4 +33,10 @@ bool io_poll_play_toggle() {
         }
     }
     return false;
+}
+
+void io_blink_led() {
+    gpio_put(LED_PIN, true);
+    sleep_ms(50);  // short blink
+    gpio_put(LED_PIN, false);
 }

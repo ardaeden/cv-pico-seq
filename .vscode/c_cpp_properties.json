@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "Pico",
+            "compilerPath": "/usr/bin/arm-none-eabi-g++",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/home/bowman/pico/pico-sdk/**",
+                "/home/bowman/pico/pico-sdk/src/**"
+            ],
+            "defines": [
+                "PICO_BOARD=pico",
+                "PICO_PLATFORM=rp2040"
+            ],
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "configurationProvider": "ms-vscode.cmake-tools",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}",
+                    "/home/bowman/pico/pico-sdk"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}

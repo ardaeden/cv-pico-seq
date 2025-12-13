@@ -2,8 +2,9 @@
 
 #include <cstdint>
 
-// Configure clock interval based on BPM.
+// Configure clock interval based on BPM and PPQN.
 void clock_set_bpm(uint32_t bpm);
+void clock_set_ppqn(uint32_t ppqn);
 
 // Launch the timing core (core1) that generates ticks.
 void clock_launch_core1();

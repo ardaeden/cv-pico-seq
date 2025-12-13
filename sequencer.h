@@ -16,3 +16,7 @@ uint32_t seq_current_step();
 // Tempo helpers
 uint32_t seq_get_bpm();
 void seq_set_bpm(uint32_t bpm);
+
+// PPQN helpers
+uint32_t seq_get_ppqn();
+void seq_set_ppqn(uint32_t ppqn);

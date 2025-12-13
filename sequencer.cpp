@@ -2,6 +2,7 @@
 
 namespace {
 volatile uint32_t bpm = 120;        // beats per minute
+volatile uint32_t ppqn = 4;         // pulses per quarter note (4 for 16th notes)
 volatile uint32_t steps = 16;       // total steps
 volatile uint32_t current_step = 0; // advanced on ticks
 volatile bool playing = true;       // play/pause flag
@@ -9,13 +10,17 @@ volatile bool playing = true;       // play/pause flag
 
 void seq_init() {
     bpm = 120;
+    ppqn = 4;  // 4 pulses per quarter note for 16th notes per step
     steps = 16;
     current_step = 0;
-    playing = true;
+    playing = false;  // start paused
 }
 
 bool seq_toggle_play() {
     playing = !playing;
+    if (!playing) {
+        current_step = 0;  // reset to first step when paused
+    }
     return playing;
 }
 
@@ -41,4 +46,12 @@ uint32_t seq_get_bpm() {
 
 void seq_set_bpm(uint32_t new_bpm) {
     bpm = new_bpm ? new_bpm : 120;
+}
+
+uint32_t seq_get_ppqn() {
+    return ppqn;
+}
+
+void seq_set_ppqn(uint32_t new_ppqn) {
+    ppqn = new_ppqn ? new_ppqn : 4;
 }
