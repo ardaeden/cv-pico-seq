@@ -11,3 +11,9 @@ void io_blink_led_start();
 
 // Update LED state - call every loop iteration
 void io_update_led();
+
+// Initialize rotary encoder (GPIO14=CLK, GPIO15=DATA, GPIO13=SW)
+void io_encoder_init();
+
+// Poll encoder rotation delta (+1=CW, -1=CCW, 0=no change)
+int io_encoder_poll_delta();

@@ -9,6 +9,7 @@ int main() {
     stdio_init_all();
 
     io_init();
+    io_encoder_init();
     seq_init();
 
     // Configure clock core using current BPM and PPQN
@@ -19,6 +20,20 @@ int main() {
     // Core0: sequencer loop consumes tick_flag and advances state
     while (true) {
         io_update_led();  // non-blocking LED update
+
+        // Poll encoder for BPM changes
+        int encoder_delta = io_encoder_poll_delta();
+        if (encoder_delta != 0) {
+            uint32_t current_bpm = seq_get_bpm();
+            int new_bpm = (int)current_bpm + encoder_delta;
+            // Clamp BPM between 20 and 300
+            if (new_bpm < 20) new_bpm = 20;
+            if (new_bpm > 300) new_bpm = 300;
+            
+            seq_set_bpm((uint32_t)new_bpm);
+            clock_set_bpm((uint32_t)new_bpm);
+            printf("BPM: %u\n", (unsigned)new_bpm);
+        }
 
         if (io_poll_play_toggle()) {
             bool is_playing = seq_toggle_play();
