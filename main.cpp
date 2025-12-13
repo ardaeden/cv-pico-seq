@@ -4,6 +4,7 @@
 #include "clock.h"
 #include "io.h"
 #include "sequencer.h"
+#include "ui.h"
 
 int main() {
     stdio_init_all();
@@ -16,6 +17,10 @@ int main() {
     clock_set_bpm(seq_get_bpm());
     clock_set_ppqn(seq_get_ppqn());
     clock_launch_core1();
+
+    // Initialize display UI (if present)
+    ui_init();
+    ui_show_bpm(seq_get_bpm());
 
     // Core0: sequencer loop consumes tick_flag and advances state
     while (true) {
@@ -32,15 +37,16 @@ int main() {
             
             seq_set_bpm((uint32_t)new_bpm);
             clock_set_bpm((uint32_t)new_bpm);
-            printf("BPM: %u\n", (unsigned)new_bpm);
+            // printf("BPM: %u\n", (unsigned)new_bpm);
+            ui_show_bpm((uint32_t)new_bpm);
         }
 
         if (io_poll_play_toggle()) {
             bool is_playing = seq_toggle_play();
-            printf("Play state: %s\n", is_playing ? "ON" : "OFF");
+            // printf("Play state: %s\n", is_playing ? "ON" : "OFF");
             if (is_playing) {
                 io_blink_led_start();  // blink immediately when starting
-                printf("LED blink at step: 0\n");
+                // printf("LED blink at step: 0\n");
             }
         }
 
@@ -55,12 +61,12 @@ int main() {
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {
                 io_blink_led_start();
-                printf("LED blink at step: %u\n", (unsigned)seq_current_step());
+                // printf("LED blink at step: %u\n", (unsigned)seq_current_step());
             }
 
             // TODO: Update CV/Gate outputs here (DAC, GPIO, etc.)
             // Placeholder: lightweight printf for debug (can be disabled)
-            printf("Step: %u\n", (unsigned)seq_current_step());
+            // printf("Step: %u\n", (unsigned)seq_current_step());
         }
 
         // Non-time-critical work can be done here: read inputs, update BPM, etc.

@@ -22,12 +22,14 @@ add_executable(${CMAKE_PROJECT_NAME}
     clock.cpp
     io.cpp
     sequencer.cpp
+    ui.cpp
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} 
     pico_stdlib
     pico_multicore
-    hardware_timer)
+    hardware_timer
+    hardware_i2c)
 
 
 pico_enable_stdio_usb(${CMAKE_PROJECT_NAME} 1)
