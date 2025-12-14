@@ -10,12 +10,23 @@ constexpr uint64_t DEBOUNCE_US = 20'000;  // 50 ms debounce window
 constexpr uint LED_PIN = 3;               // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 50'000;  // 50 ms LED on time
 
+constexpr uint GATE_PIN = 6;              // GP6
+constexpr uint64_t DEFAULT_GATE_US = 100'000; // 100 ms gate
+
+bool gate_active = false;
+uint64_t gate_start_us = 0;
+uint64_t gate_duration_us = 0;
+
 constexpr uint ENCODER_CLK = 14;          // GP14
 constexpr uint ENCODER_DATA = 15;         // GP15
 constexpr uint ENCODER_SW = 13;           // GP13
 
 bool button_prev = true;               // starts high because of pull-up
 uint64_t last_button_event_us = 0;     // last time we toggled play state
+
+// Encoder switch debounce
+bool encoder_sw_prev = true;
+uint64_t last_encoder_sw_event_us = 0;
 
 bool led_blinking = false;             // LED blink state
 uint64_t led_blink_start_us = 0;       // LED blink start timestamp
@@ -31,6 +42,34 @@ void io_init() {
 
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
+
+    // Gate pin init (default low)
+    gpio_init(GATE_PIN);
+    gpio_set_dir(GATE_PIN, GPIO_OUT);
+    gpio_put(GATE_PIN, false);
+}
+
+void io_gate_init() {
+    gpio_init(GATE_PIN);
+    gpio_set_dir(GATE_PIN, GPIO_OUT);
+    gpio_put(GATE_PIN, false);
+}
+
+void io_gate_pulse_us(uint64_t duration_us) {
+    gpio_put(GATE_PIN, true);
+    gate_active = true;
+    gate_start_us = time_us_64();
+    gate_duration_us = duration_us ? duration_us : DEFAULT_GATE_US;
+}
+
+void io_update_gate() {
+    if (gate_active) {
+        uint64_t now_us = time_us_64();
+        if ((now_us - gate_start_us) >= gate_duration_us) {
+            gpio_put(GATE_PIN, false);
+            gate_active = false;
+        }
+    }
 }
 
 bool io_poll_play_toggle() {
@@ -76,6 +115,7 @@ void io_encoder_init() {
     gpio_pull_up(ENCODER_SW);
 
     encoder_clk_prev = gpio_get(ENCODER_CLK);
+    encoder_sw_prev = gpio_get(ENCODER_SW);
 }
 
 int io_encoder_poll_delta() {
@@ -91,4 +131,17 @@ int io_encoder_poll_delta() {
     
     encoder_clk_prev = clk_now;
     return 0;
+}
+
+bool io_encoder_button_pressed() {
+    bool sw_now = gpio_get(ENCODER_SW);
+    uint64_t now_us = time_us_64();
+    if (sw_now != encoder_sw_prev && (now_us - last_encoder_sw_event_us) >= DEBOUNCE_US) {
+        encoder_sw_prev = sw_now;
+        last_encoder_sw_event_us = now_us;
+        if (!sw_now) { // active-low press
+            return true;
+        }
+    }
+    return false;
 }
