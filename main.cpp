@@ -65,8 +65,9 @@ int main() {
 
             seq_advance_step();
 
-            // Pulse gate on each step
-            io_gate_pulse_us(100000); // 100 ms gate pulse
+            // Pulse gate on each step: 50% of current step duration
+            uint32_t step_us = clock_get_interval_us();
+            io_gate_pulse_us(step_us / 2);
 
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {

@@ -57,3 +57,7 @@ bool clock_consume_tick() {
     tick_flag = false;
     return true;
 }
+
+uint32_t clock_get_interval_us() {
+    return clock_interval_us;
+}
