@@ -1,6 +1,7 @@
 #include "io.h"
 
 #include "hardware/gpio.h"
+#include <atomic>
 #include "pico/stdlib.h"
 #include "pico/time.h"
 
@@ -34,6 +35,8 @@ uint64_t led_blink_start_us = 0;       // LED blink start timestamp
 // Encoder state tracking (quadrature)
 uint8_t encoder_prev_state = 0;        // combined CLK/DATA previous state
 int8_t encoder_accum = 0;              // accumulate quadrature deltas per detent
+std::atomic<int> encoder_pending{0};   // completed detent steps awaiting main loop
+constexpr int ENCODER_DETENT_STEPS = 2; // transitions required per detent (lower = more sensitive)
 constexpr int ENCODER_DETENT_STEPS = 2; // transitions required per detent (lower = more sensitive)
 } // namespace
 
@@ -121,16 +124,27 @@ void io_encoder_init() {
     bool data = gpio_get(ENCODER_DATA);
     encoder_prev_state = (uint8_t)((clk << 1) | data);
     encoder_sw_prev = gpio_get(ENCODER_SW);
+
+    // Install IRQ callback for both encoder pins (handle in ISR for robustness)
+    // Callback will run on GPIO edge and accumulate quadrature transitions.
+    static void encoder_gpio_irq(uint gpio, uint32_t events);
+    gpio_set_irq_enabled_with_callback(ENCODER_CLK, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, encoder_gpio_irq);
+    gpio_set_irq_enabled_with_callback(ENCODER_DATA, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, encoder_gpio_irq);
 }
 
 int io_encoder_poll_delta() {
-    // Read current pins
+    // Return any accumulated detent steps from ISR (atomic)
+    int pending = encoder_pending.exchange(0);
+    return pending;
+}
+
+// GPIO IRQ handler implemented after poll function to keep top-level flow readable.
+static void encoder_gpio_irq(uint gpio, uint32_t events) {
     bool clk = gpio_get(ENCODER_CLK);
     bool data = gpio_get(ENCODER_DATA);
     uint8_t cur = (uint8_t)((clk << 1) | data);
 
     // State transition table for quadrature decoding
-    // index = (prev<<2) | cur
     static const int8_t trans_table[16] = {
         0, -1,  1,  0,
         1,  0,  0, -1,
@@ -142,18 +156,16 @@ int io_encoder_poll_delta() {
     int8_t delta = trans_table[idx & 0x0F];
     encoder_prev_state = cur;
 
-    // Accumulate transitions; require 4 counts for a full detent
     if (delta != 0) {
         encoder_accum += delta;
         if (encoder_accum >= ENCODER_DETENT_STEPS) {
             encoder_accum = 0;
-            return 1;
+            encoder_pending.fetch_add(1);
         } else if (encoder_accum <= -ENCODER_DETENT_STEPS) {
             encoder_accum = 0;
-            return -1;
+            encoder_pending.fetch_sub(1);
         }
     }
-    return 0;
 }
 
 bool io_encoder_button_pressed() {
