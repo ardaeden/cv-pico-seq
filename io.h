@@ -15,7 +15,6 @@ void io_blink_led_start();
 void io_update_led();
 
 // Gate output on GP6: pulse for a step. Duration in microseconds.
-void io_gate_init();
 void io_gate_pulse_us(uint64_t duration_us);
 void io_update_gate();
 
@@ -28,8 +27,4 @@ int io_encoder_poll_delta();
 // Encoder switch (button) press - debounced edge (active-low)
 bool io_encoder_button_pressed();
 
-// Suppress the next automatic step-aligned LED blink (used to avoid double-blink on start)
-void io_suppress_next_step_blink();
-
-// Consume and return whether a step blink is currently suppressed (atomically clears flag)
-bool io_consume_step_blink_suppressed();
+// (no suppression APIs; LED blink controlled by main loop)

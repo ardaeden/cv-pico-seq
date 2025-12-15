@@ -32,9 +32,6 @@ uint64_t last_encoder_sw_event_us = 0;
 bool led_blinking = false;             // LED blink state
 uint64_t led_blink_start_us = 0;       // LED blink start timestamp
 
-// Suppress next step-aligned blink to avoid double blink when starting
-std::atomic<bool> suppress_next_step_blink{false};
-constexpr uint64_t SUPPRESS_WINDOW_US = 150000; // 150 ms window to suppress automatic step blink
 
 // Encoder state tracking (quadrature)
 uint8_t encoder_prev_state = 0;        // combined CLK/DATA previous state
@@ -101,20 +98,6 @@ void io_blink_led_start() {
     gpio_put(LED_PIN, true);
     led_blinking = true;
     led_blink_start_us = time_us_64();
-}
-
-void io_suppress_next_step_blink() {
-    suppress_next_step_blink.store(true);
-}
-
-bool io_consume_step_blink_suppressed() {
-    bool was = suppress_next_step_blink.exchange(false);
-    if (!was) return false;
-    // If we just blinked manually within the suppression window, suppress the automatic blink.
-    uint64_t now = time_us_64();
-    uint64_t elapsed = (now >= led_blink_start_us) ? (now - led_blink_start_us) : 0;
-    if (elapsed <= SUPPRESS_WINDOW_US) return true;
-    return false; // blink happened long enough ago; do not suppress
 }
 
 void io_update_led() {
