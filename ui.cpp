@@ -167,11 +167,87 @@ void ui_show_bpm(uint32_t bpm) {
     int len = snprintf(buf, sizeof(buf), "%u", (unsigned)bpm);
     if (len <= 0) return;
     // Small BPM display at top-left using 5x7 font
-    ssd1306_clear_fb();
+    // Erase only page 0 area where BPM is displayed (do not clear whole fb)
+    for (int i = 0; i < 128; ++i) fb[0 * 128 + i] = 0x00;
     int x = 0;
     for (int i = 0; i < len; ++i) {
         ui_draw_char(x, 0, buf[i]);
         x += 6;
     }
+    ssd1306_update();
+}
+
+// Helper: clear rectangular region (inclusive) in pixel coords
+static void clear_region(int x0, int y0, int w, int h) {
+    if (w <= 0 || h <= 0) return;
+    int x1 = x0 + w - 1;
+    int y1 = y0 + h - 1;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 >= 128) x1 = 127;
+    if (y1 >= 64) y1 = 63;
+    for (int y = y0; y <= y1; ++y) {
+        int page = y >> 3;
+        int bit = y & 7;
+        for (int x = x0; x <= x1; ++x) {
+            fb[page * 128 + x] &= ~(1u << bit);
+        }
+    }
+}
+
+static void draw_rect_outline(int x0, int y0, int w, int h) {
+    for (int x = x0; x < x0 + w; ++x) {
+        set_pixel(x, y0);
+        set_pixel(x, y0 + h - 1);
+    }
+    for (int y = y0; y < y0 + h; ++y) {
+        set_pixel(x0, y);
+        set_pixel(x0 + w - 1, y);
+    }
+}
+
+static void fill_rect(int x0, int y0, int w, int h) {
+    for (int y = y0; y < y0 + h; ++y) {
+        for (int x = x0; x < x0 + w; ++x) {
+            set_pixel(x, y);
+        }
+    }
+}
+
+void ui_show_steps(uint32_t current_step, uint32_t steps) {
+    if (steps == 0) return;
+    const int sq = 12;
+    const int spacing = 4;
+    const int cols = 8;
+    const int total_w = cols * sq + (cols - 1) * spacing; // 124
+    const int left = (128 - total_w) / 2;
+    const int top_y = 6;
+    const int bottom_y = top_y + sq + 8;
+
+    // Clear grid area
+    clear_region(left - 1, top_y - 1, total_w + 2, (sq * 2) + 8 + 2);
+
+    for (int i = 0; i < (int)steps && i < 16; ++i) {
+        int col = i % cols;
+        int row = i / cols;
+        int x = left + col * (sq + spacing);
+        int y = (row == 0) ? top_y : bottom_y;
+        draw_rect_outline(x, y, sq, sq);
+        char buf[4];
+        int n = i + 1;
+        int len = snprintf(buf, sizeof(buf), "%d", n);
+        int text_x = x + (sq - (6 * len - 1)) / 2;
+        int text_page = y / 8;
+        for (int k = 0; k < len; ++k) ui_draw_char(text_x + k * 6, text_page, buf[k]);
+    }
+
+    if (current_step < steps && current_step < 16) {
+        int col = current_step % cols;
+        int row = current_step / cols;
+        int x = left + col * (sq + spacing);
+        int y = (row == 0) ? top_y : bottom_y;
+        fill_rect(x + 2, y + 2, sq - 4, sq - 4);
+    }
+
     ssd1306_update();
 }
