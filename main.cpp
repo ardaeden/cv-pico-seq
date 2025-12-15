@@ -1,5 +1,4 @@
 #include "pico/stdlib.h"
-#include <cstdio>
 
 #include "clock.h"
 #include "io.h"
@@ -54,16 +53,16 @@ int main() {
             
             seq_set_bpm((uint32_t)new_bpm);
             clock_set_bpm((uint32_t)new_bpm);
-            // printf("BPM: %u\n", (unsigned)new_bpm);
+            // debug: BPM changed
             ui_show_bpm((uint32_t)new_bpm);
         }
 
         if (io_poll_play_toggle()) {
             bool is_playing = seq_toggle_play();
-            // printf("Play state: %s\n", is_playing ? "ON" : "OFF");
+            // debug: play toggled
             if (is_playing) {
                 io_blink_led_start();  // blink immediately when starting
-                // printf("LED blink at step: 0\n");
+                // debug: LED blink at start
             }
         }
 
@@ -94,12 +93,10 @@ int main() {
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {
                 io_blink_led_start();
-                // printf("LED blink at step: %u\n", (unsigned)seq_current_step());
+                // debug: LED blink at step
             }
 
             // TODO: Update CV/Gate outputs here (DAC, GPIO, etc.)
-            // Placeholder: lightweight printf for debug (can be disabled)
-            // printf("Step: %u\n", (unsigned)seq_current_step());
         }
 
         // Non-time-critical work can be done here: read inputs, update BPM, etc.

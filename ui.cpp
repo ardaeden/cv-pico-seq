@@ -153,7 +153,6 @@ void ui_init() {
     uint8_t probe = 0x00;
     int probe_res = i2c_write_blocking(i2c0, SSD1306_ADDR, &probe, 1, false);
     if (probe_res < 0) {
-        // printf("SSD1306 not detected at 0x%02x (i2c write error %d)\n", SSD1306_ADDR, probe_res);
         return;
     }
 
