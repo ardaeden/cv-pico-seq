@@ -22,6 +22,8 @@ int main() {
     // Initialize display UI (if present)
     ui_init();
     ui_show_bpm(seq_get_bpm());
+    // Draw step grid immediately on boot so boxes are visible before playback
+    ui_show_steps(seq_current_step(), seq_get_steps());
 
     // Initialize MCP4822 DAC (SPI0: SCK=GP18, MOSI=GP19, CS=GP17)
     mcp4822_init(17);
