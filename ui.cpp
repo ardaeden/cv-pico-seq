@@ -233,12 +233,6 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
         int x = left + col * (sq + spacing);
         int y = (row == 0) ? top_y : bottom_y;
         draw_rect_outline(x, y, sq, sq);
-        char buf[4];
-        int n = i + 1;
-        int len = snprintf(buf, sizeof(buf), "%d", n);
-        int text_x = x + (sq - (6 * len - 1)) / 2;
-        int text_page = y / 8;
-        for (int k = 0; k < len; ++k) ui_draw_char(text_x + k * 6, text_page, buf[k]);
     }
 
     if (current_step < steps && current_step < 16) {
