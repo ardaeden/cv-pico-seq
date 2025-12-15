@@ -31,8 +31,8 @@ uint64_t last_encoder_sw_event_us = 0;
 bool led_blinking = false;             // LED blink state
 uint64_t led_blink_start_us = 0;       // LED blink start timestamp
 
-// Encoder state tracking
-bool encoder_clk_prev = true;          // previous CLK state
+// Encoder state tracking (quadrature)
+uint8_t encoder_prev_state = 0;        // combined CLK/DATA previous state
 } // namespace
 
 void io_init() {
@@ -114,23 +114,32 @@ void io_encoder_init() {
     gpio_set_dir(ENCODER_SW, GPIO_IN);
     gpio_pull_up(ENCODER_SW);
 
-    encoder_clk_prev = gpio_get(ENCODER_CLK);
+    // Initialize previous combined state (CLK<<1 | DATA)
+    bool clk = gpio_get(ENCODER_CLK);
+    bool data = gpio_get(ENCODER_DATA);
+    encoder_prev_state = (uint8_t)((clk << 1) | data);
     encoder_sw_prev = gpio_get(ENCODER_SW);
 }
 
 int io_encoder_poll_delta() {
-    bool clk_now = gpio_get(ENCODER_CLK);
-    
-    // Detect falling edge on CLK
-    if (encoder_clk_prev && !clk_now) {
-        bool data = gpio_get(ENCODER_DATA);
-        encoder_clk_prev = clk_now;
-            // If DATA is low on CLK falling edge -> CCW, if high -> CW
-            return data ? 1 : -1;
-    }
-    
-    encoder_clk_prev = clk_now;
-    return 0;
+    // Read current pins
+    bool clk = gpio_get(ENCODER_CLK);
+    bool data = gpio_get(ENCODER_DATA);
+    uint8_t cur = (uint8_t)((clk << 1) | data);
+
+    // State transition table for quadrature decoding
+    // index = (prev<<2) | cur
+    static const int8_t trans_table[16] = {
+        0, -1,  1,  0,
+        1,  0,  0, -1,
+       -1,  0,  0,  1,
+        0,  1, -1,  0
+    };
+
+    uint8_t idx = (uint8_t)((encoder_prev_state << 2) | cur);
+    int8_t delta = trans_table[idx & 0x0F];
+    encoder_prev_state = cur;
+    return (int)delta;
 }
 
 bool io_encoder_button_pressed() {
