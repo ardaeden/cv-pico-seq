@@ -221,7 +221,7 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
     const int cols = 8;
     const int total_w = cols * sq + (cols - 1) * spacing; // 124
     const int left = (128 - total_w) / 2;
-    const int top_y = 6;
+    const int top_y = 20;
     const int bottom_y = top_y + sq + 8;
 
     // Clear grid area
