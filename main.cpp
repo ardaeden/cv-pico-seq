@@ -85,8 +85,9 @@ int main() {
             if (dac_val > 0x0FFF) dac_val = 0x0FFF;
             // Use gain=1 to match example semantics (gain=2x hardware selection)
             mcp4822_set_voltage(0, 1, dac_val);
-            // Update step display
+            // Update step display (draw steps), then redraw BPM on top so BPM remains visible
             ui_show_steps(seq_current_step(), seq_get_steps());
+            ui_show_bpm(seq_get_bpm());
 
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {
