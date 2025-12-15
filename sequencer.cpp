@@ -67,3 +67,7 @@ uint32_t seq_get_ppqn() {
 void seq_set_ppqn(uint32_t new_ppqn) {
     state.ppqn = new_ppqn ? new_ppqn : 4;
 }
+
+uint32_t seq_get_steps() {
+    return state.steps;
+}

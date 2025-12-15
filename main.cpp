@@ -5,6 +5,7 @@
 #include "io.h"
 #include "sequencer.h"
 #include "ui.h"
+#include "mcp4822.h"
 
 int main() {
     stdio_init_all();
@@ -21,6 +22,13 @@ int main() {
     // Initialize display UI (if present)
     ui_init();
     ui_show_bpm(seq_get_bpm());
+
+    // Initialize MCP4822 DAC (SPI0: SCK=GP18, MOSI=GP19, CS=GP17)
+    mcp4822_init(17);
+
+    // NOTE scaling to match example: 88-note mapping to 0..4095 units
+    // NOTE_SF approximates (4095/87) per example
+    const float NOTE_SF = 47.069f;
 
     // Core0: sequencer loop consumes tick_flag and advances state
     int encoder_step = 1; // 1 = fine, 10 = coarse
@@ -68,6 +76,15 @@ int main() {
             // Pulse gate on each step: 50% of current step duration
             uint32_t step_us = clock_get_interval_us();
             io_gate_pulse_us(step_us / 2);
+
+            // Compute and set CV for current step using MCP4822 channel A
+            // Use same mapping as example: scaled by NOTE_SF
+            uint32_t cur = seq_current_step();
+            uint16_t dac_val = (uint16_t)((float)cur * NOTE_SF + 0.5f);
+            // clamp
+            if (dac_val > 0x0FFF) dac_val = 0x0FFF;
+            // Use gain=1 to match example semantics (gain=2x hardware selection)
+            mcp4822_set_voltage(0, 1, dac_val);
 
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {
