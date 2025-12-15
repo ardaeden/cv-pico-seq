@@ -162,15 +162,22 @@ void ui_init() {
 }
 
 void ui_show_bpm(uint32_t bpm) {
-    char buf[16];
-    int len = snprintf(buf, sizeof(buf), "%u", (unsigned)bpm);
-    if (len <= 0) return;
+    char numbuf[16];
+    int numlen = snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
+    if (numlen <= 0) return;
     // Small BPM display at top-left using 5x7 font
     // Erase only page 0 area where BPM is displayed (do not clear whole fb)
     for (int i = 0; i < 128; ++i) fb[0 * 128 + i] = 0x00;
     int x = 0;
-    for (int i = 0; i < len; ++i) {
-        ui_draw_char(x, 0, buf[i]);
+    // Draw label "BPM:" (font contains B, P, M and ':')
+    const char *label = "BPM:";
+    for (const char *p = label; *p; ++p) {
+        ui_draw_char(x, 0, *p);
+        x += 6;
+    }
+    // Small gap before number (already accounted by char spacing)
+    for (int i = 0; i < numlen; ++i) {
+        ui_draw_char(x, 0, numbuf[i]);
         x += 6;
     }
     ssd1306_update();
