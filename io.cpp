@@ -32,12 +32,18 @@ uint64_t last_encoder_sw_event_us = 0;
 bool led_blinking = false;             // LED blink state
 uint64_t led_blink_start_us = 0;       // LED blink start timestamp
 
+// Suppress next step-aligned blink to avoid double blink when starting
+std::atomic<bool> suppress_next_step_blink{false};
+
 // Encoder state tracking (quadrature)
 uint8_t encoder_prev_state = 0;        // combined CLK/DATA previous state
 int8_t encoder_accum = 0;              // accumulate quadrature deltas per detent
 std::atomic<int> encoder_pending{0};   // completed detent steps awaiting main loop
 constexpr int ENCODER_DETENT_STEPS = 2; // transitions required per detent (lower = more sensitive)
-constexpr int ENCODER_DETENT_STEPS = 2; // transitions required per detent (lower = more sensitive)
+
+// Forward-declare IRQ handler (defined later in another anonymous namespace block)
+void encoder_gpio_irq(uint gpio, uint32_t events);
+
 } // namespace
 
 void io_init() {
@@ -96,6 +102,14 @@ void io_blink_led_start() {
     led_blink_start_us = time_us_64();
 }
 
+void io_suppress_next_step_blink() {
+    suppress_next_step_blink.store(true);
+}
+
+bool io_consume_step_blink_suppressed() {
+    return suppress_next_step_blink.exchange(false);
+}
+
 void io_update_led() {
     if (led_blinking) {
         uint64_t now_us = time_us_64();
@@ -127,7 +141,6 @@ void io_encoder_init() {
 
     // Install IRQ callback for both encoder pins (handle in ISR for robustness)
     // Callback will run on GPIO edge and accumulate quadrature transitions.
-    static void encoder_gpio_irq(uint gpio, uint32_t events);
     gpio_set_irq_enabled_with_callback(ENCODER_CLK, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, encoder_gpio_irq);
     gpio_set_irq_enabled_with_callback(ENCODER_DATA, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, encoder_gpio_irq);
 }
@@ -138,8 +151,9 @@ int io_encoder_poll_delta() {
     return pending;
 }
 
+namespace {
 // GPIO IRQ handler implemented after poll function to keep top-level flow readable.
-static void encoder_gpio_irq(uint gpio, uint32_t events) {
+void encoder_gpio_irq(uint gpio, uint32_t events) {
     bool clk = gpio_get(ENCODER_CLK);
     bool data = gpio_get(ENCODER_DATA);
     uint8_t cur = (uint8_t)((clk << 1) | data);
@@ -167,6 +181,7 @@ static void encoder_gpio_irq(uint gpio, uint32_t events) {
         }
     }
 }
+} // namespace
 
 bool io_encoder_button_pressed() {
     bool sw_now = gpio_get(ENCODER_SW);

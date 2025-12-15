@@ -62,7 +62,8 @@ int main() {
             // debug: play toggled
             if (is_playing) {
                 io_blink_led_start();  // blink immediately when starting
-                // debug: LED blink at start
+                // suppress the next automatic step-aligned blink to avoid double-blink
+                io_suppress_next_step_blink();
             }
         }
 
@@ -92,8 +93,10 @@ int main() {
 
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {
-                io_blink_led_start();
-                // debug: LED blink at step
+                if (!io_consume_step_blink_suppressed()) {
+                    io_blink_led_start();
+                }
+                // debug: LED blink at step (suppressed if just started)
             }
 
             // TODO: Update CV/Gate outputs here (DAC, GPIO, etc.)

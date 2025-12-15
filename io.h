@@ -27,3 +27,9 @@ int io_encoder_poll_delta();
 
 // Encoder switch (button) press - debounced edge (active-low)
 bool io_encoder_button_pressed();
+
+// Suppress the next automatic step-aligned LED blink (used to avoid double-blink on start)
+void io_suppress_next_step_blink();
+
+// Consume and return whether a step blink is currently suppressed (atomically clears flag)
+bool io_consume_step_blink_suppressed();
