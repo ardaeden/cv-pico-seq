@@ -166,17 +166,12 @@ void ui_show_bpm(uint32_t bpm) {
     char buf[16];
     int len = snprintf(buf, sizeof(buf), "%u", (unsigned)bpm);
     if (len <= 0) return;
-
-    // full-screen big digits: choose scale so digits are large but fit
-    const int scale = 6; // 5*6=30px high per digit row (7*6=42px tall)
-    const int char_w = 5 * scale + scale; // include spacing
-    int total_w = len * char_w;
-    int start_x = (128 - total_w) / 2;
-    int start_y = (64 - (7 * scale)) / 2;
-
+    // Small BPM display at top-left using 5x7 font
     ssd1306_clear_fb();
+    int x = 0;
     for (int i = 0; i < len; ++i) {
-        draw_scaled_char(start_x + i * char_w, start_y, buf[i], scale);
+        ui_draw_char(x, 0, buf[i]);
+        x += 6;
     }
     ssd1306_update();
 }
