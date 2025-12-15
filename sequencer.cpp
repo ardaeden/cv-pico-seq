@@ -29,7 +29,11 @@ bool seq_toggle_play() {
         // expected is updated by compare_exchange_weak on failure
     }
     bool is_playing = !expected;
-    if (!is_playing) {
+    if (is_playing) {
+        // When starting playback, set current_step to the previous step
+        // so the first advance moves to step 0 (first step).
+        state.current_step = state.steps ? (state.steps - 1) : 15;
+    } else {
         state.current_step = 0; // reset to first step when paused
     }
     return is_playing;
@@ -37,7 +41,11 @@ bool seq_toggle_play() {
 
 void seq_set_play(bool enable) {
     state.playing.store(enable);
-    if (!enable) state.current_step = 0;
+    if (enable) {
+        state.current_step = state.steps ? (state.steps - 1) : 15;
+    } else {
+        state.current_step = 0;
+    }
 }
 
 bool seq_is_playing() {
