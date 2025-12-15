@@ -33,6 +33,7 @@ uint64_t led_blink_start_us = 0;       // LED blink start timestamp
 
 // Encoder state tracking (quadrature)
 uint8_t encoder_prev_state = 0;        // combined CLK/DATA previous state
+int8_t encoder_accum = 0;              // accumulate quadrature deltas per detent
 } // namespace
 
 void io_init() {
@@ -139,7 +140,19 @@ int io_encoder_poll_delta() {
     uint8_t idx = (uint8_t)((encoder_prev_state << 2) | cur);
     int8_t delta = trans_table[idx & 0x0F];
     encoder_prev_state = cur;
-    return (int)delta;
+
+    // Accumulate transitions; require 4 counts for a full detent
+    if (delta != 0) {
+        encoder_accum += delta;
+        if (encoder_accum >= 4) {
+            encoder_accum = 0;
+            return 1;
+        } else if (encoder_accum <= -4) {
+            encoder_accum = 0;
+            return -1;
+        }
+    }
+    return 0;
 }
 
 bool io_encoder_button_pressed() {
