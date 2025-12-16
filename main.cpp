@@ -7,15 +7,12 @@
 #include "mcp4822.h"
 
 int main() {
-    stdio_init_all();
-
     io_init();
     io_encoder_init();
     seq_init();
 
     // Configure clock core using current BPM and PPQN
     clock_set_bpm(seq_get_bpm());
-    clock_set_ppqn(seq_get_ppqn());
     clock_launch_core1();
 
     // Initialize display UI (if present)

@@ -71,11 +71,6 @@ void clock_set_bpm(uint32_t bpm) {
     clock_interval_us = static_cast<uint32_t>(us_per_quarter / ppqn);
 }
 
-void clock_set_ppqn(uint32_t new_ppqn) {
-    ppqn = new_ppqn ? new_ppqn : 4;
-    // Recalculate interval if needed, but since bpm might change, better to call set_bpm after
-}
-
 void clock_launch_core1() {
     multicore_launch_core1(core1_main);
 }
