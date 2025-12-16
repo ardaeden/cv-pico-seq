@@ -79,6 +79,9 @@ int main() {
             uint32_t step_us = clock_get_interval_us();
             io_gate_pulse_us(step_us / 2);
 
+            // Tick the gate state machine (decrements tick-based gate timer)
+            io_gate_tick();
+
             // Compute and set CV for current step using MCP4822 channel A
             uint32_t cur = seq_current_step();
             uint16_t dac_val = (uint16_t)((float)cur * NOTE_SF + 0.5f);

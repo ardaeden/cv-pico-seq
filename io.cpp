@@ -4,6 +4,7 @@
 #include <atomic>
 #include "pico/stdlib.h"
 #include "pico/time.h"
+#include "clock.h"
 
 namespace {
 constexpr uint BUTTON_PIN = 2;            // GP2
@@ -14,9 +15,10 @@ constexpr uint64_t LED_BLINK_DURATION_US = 50'000;  // 50 ms LED on time
 constexpr uint GATE_PIN = 6;              // GP6
 constexpr uint64_t DEFAULT_GATE_US = 100'000; // 100 ms gate
 
+// Gate state tracked in ticks for robustness across tempo changes
 bool gate_active = false;
-uint64_t gate_start_us = 0;
-uint64_t gate_duration_us = 0;
+uint32_t gate_ticks_remaining = 0;
+uint32_t gate_ticks_total = 0;
 
 constexpr uint ENCODER_CLK = 14;          // GP14
 constexpr uint ENCODER_DATA = 15;         // GP15
@@ -68,24 +70,35 @@ void io_gate_pulse_us(uint64_t duration_us) {
     // If gate already active, ignore retrigger to avoid extending on-time
     if (gate_active) return;
 
-    // Sanitize duration: use default when zero, and clamp to a reasonable maximum
-    uint64_t dur = duration_us ? duration_us : DEFAULT_GATE_US;
-    // Prevent absurdly long gate compared to default
-    if (dur > 10 * DEFAULT_GATE_US) dur = 10 * DEFAULT_GATE_US;
+    // Sanitize duration in us
+    uint64_t dur_us = duration_us ? duration_us : DEFAULT_GATE_US;
+    if (dur_us > 10 * DEFAULT_GATE_US) dur_us = 10 * DEFAULT_GATE_US;
 
+    // Convert requested microsecond duration to ticks based on current clock interval
+    uint32_t tick_us = clock_get_interval_us();
+    if (tick_us == 0) tick_us = 1;
+    uint32_t ticks = (uint32_t)((dur_us + tick_us / 2) / tick_us);
+    if (ticks == 0) ticks = 1;
+
+    // Arm gate in tick units
+    gate_ticks_total = ticks;
+    gate_ticks_remaining = ticks;
     gpio_put(GATE_PIN, true);
     gate_active = true;
-    gate_start_us = time_us_64();
-    gate_duration_us = dur;
 }
 
 void io_update_gate() {
-    if (gate_active) {
-        uint64_t now_us = time_us_64();
-        if ((now_us - gate_start_us) >= gate_duration_us) {
-            gpio_put(GATE_PIN, false);
-            gate_active = false;
-        }
+    // Deprecated: kept for compatibility but does nothing when using tick-based gating
+}
+
+void io_gate_tick() {
+    if (!gate_active) return;
+    if (gate_ticks_remaining > 0) {
+        --gate_ticks_remaining;
+    }
+    if (gate_ticks_remaining == 0) {
+        gpio_put(GATE_PIN, false);
+        gate_active = false;
     }
 }
 
