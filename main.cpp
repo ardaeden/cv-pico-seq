@@ -27,13 +27,9 @@ int main() {
     // Initialize MCP4822 DAC (SPI0: SCK=GP18, MOSI=GP19, CS=GP17)
     mcp4822_init(17);
 
-    // NOTE scaling to match example: 88-note mapping to 0..4095 units
-    // NOTE_SF approximates (4095/87) per example
     const float NOTE_SF = 47.069f;
 
-    // Core0: sequencer loop consumes tick_flag and advances state
     int encoder_step = 1; // 1 = fine, 10 = coarse
-    // no tick accumulation: advance once per tick (tick == 16th note when ppqn==4)
     while (true) {
         io_update_led();  // non-blocking LED update
 
@@ -53,17 +49,12 @@ int main() {
             
             seq_set_bpm((uint32_t)new_bpm);
             clock_set_bpm((uint32_t)new_bpm);
-            // debug: BPM changed
             ui_show_bpm((uint32_t)new_bpm);
         }
 
         if (io_poll_play_toggle()) {
             bool is_playing = seq_toggle_play();
             clock_gate_enable(is_playing);
-            // debug: play toggled
-            if (is_playing) {
-                // start without an immediate manual blink; step-aligned blink will indicate activity
-            }
         }
 
         if (clock_consume_tick()) {
@@ -74,8 +65,6 @@ int main() {
 
             // Advance one step per tick (tick represents 16th note when ppqn==4)
             seq_advance_step();
-
-            // Gate pulse automatic on GP6 (50% duty, handled by core 1)
 
             // Compute and set CV for current step using MCP4822 channel A
             uint32_t cur = seq_current_step();
@@ -93,7 +82,6 @@ int main() {
             }
         }
 
-        // Non-time-critical work can be done here: read inputs, update BPM, etc.
         tight_loop_contents();
     }
 }

@@ -8,7 +8,6 @@
 namespace {
 volatile uint64_t us_counter = 0;            // accumulates microseconds
 volatile uint32_t clock_interval_us = 5000;  // target interval in microseconds
-volatile uint64_t last_tick = 0;
 volatile bool tick_flag = false;             // set by core1, consumed by core0
 volatile uint32_t ppqn = 4;                  // pulses per quarter note
 
@@ -26,7 +25,6 @@ bool timer_callback(struct repeating_timer *t) {
     us_counter += 100;
 
     if (us_counter >= clock_interval_us) {
-        last_tick = last_tick + us_counter;
         us_counter = 0;
         tick_flag = true; // notify core0 of a timing tick
         

@@ -39,15 +39,6 @@ bool seq_toggle_play() {
     return is_playing;
 }
 
-void seq_set_play(bool enable) {
-    state.playing.store(enable);
-    if (enable) {
-        state.current_step = state.steps ? (state.steps - 1) : 15;
-    } else {
-        state.current_step = 0;
-    }
-}
-
 bool seq_is_playing() {
     return state.playing.load();
 }
@@ -70,10 +61,6 @@ void seq_set_bpm(uint32_t new_bpm) {
 
 uint32_t seq_get_ppqn() {
     return state.ppqn;
-}
-
-void seq_set_ppqn(uint32_t new_ppqn) {
-    state.ppqn = new_ppqn ? new_ppqn : 4;
 }
 
 uint32_t seq_get_steps() {
