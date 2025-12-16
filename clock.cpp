@@ -3,13 +3,12 @@
 #include "hardware/timer.h"
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
-#include <atomic>
 
 namespace {
 volatile uint64_t us_counter = 0;            // accumulates microseconds
 volatile uint32_t clock_interval_us = 5000;  // target interval in microseconds
 volatile uint64_t last_tick = 0;
-std::atomic<uint32_t> tick_count{0};         // number of pending ticks produced by core1
+volatile bool tick_flag = false;             // set by core1, consumed by core0
 volatile uint32_t ppqn = 4;                  // pulses per quarter note
 
 struct repeating_timer timer_state;
@@ -17,12 +16,11 @@ struct repeating_timer timer_state;
 bool timer_callback(struct repeating_timer *t) {
     // Timer runs every 100 microseconds; accumulate real microseconds
     us_counter += 100;
-    // Produce one or more ticks if we've accumulated enough microseconds.
-    // Use a loop so we don't lose ticks if clock_interval_us is small.
-    while (us_counter >= clock_interval_us && clock_interval_us > 0) {
-        us_counter -= clock_interval_us;
-        last_tick = last_tick + clock_interval_us;
-        tick_count.fetch_add(1, std::memory_order_relaxed);
+
+    if (us_counter >= clock_interval_us) {
+        last_tick = last_tick + us_counter;
+        us_counter = 0;
+        tick_flag = true; // notify core0 of a timing tick
     }
     return true;
 }
@@ -41,12 +39,6 @@ void clock_set_bpm(uint32_t bpm) {
     // microseconds per pulse = (60e6 / BPM) / PPQN
     uint64_t us_per_quarter = 60000000ULL / (bpm ? bpm : 120);
     clock_interval_us = static_cast<uint32_t>(us_per_quarter / ppqn);
-    // Keep any pending ticks (do not clear tick_count) so gate/steps continue smoothly.
-    // Adjust the microsecond accumulator to fit the new interval so we don't produce
-    // an unexpected immediate tick or long gap: fold accumulator into new interval.
-    if (clock_interval_us > 0) {
-        us_counter = us_counter % clock_interval_us;
-    }
 }
 
 void clock_set_ppqn(uint32_t new_ppqn) {
@@ -59,10 +51,10 @@ void clock_launch_core1() {
 }
 
 bool clock_consume_tick() {
-    uint32_t c = tick_count.load(std::memory_order_relaxed);
-    if (c == 0) return false;
-    // decrement one tick atomically
-    tick_count.fetch_sub(1, std::memory_order_relaxed);
+    if (!tick_flag) {
+        return false;
+    }
+    tick_flag = false;
     return true;
 }
 

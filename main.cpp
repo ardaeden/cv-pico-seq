@@ -36,7 +36,6 @@ int main() {
     // no tick accumulation: advance once per tick (tick == 16th note when ppqn==4)
     while (true) {
         io_update_led();  // non-blocking LED update
-        io_update_gate(); // non-blocking gate update
 
         // Encoder button toggles fine/coarse step
         if (io_encoder_button_pressed()) {
@@ -72,15 +71,10 @@ int main() {
                 continue;
             }
 
-            // First, advance any existing gate state for this tick (decrement remaining ticks)
-            io_gate_tick();
-
             // Advance one step per tick (tick represents 16th note when ppqn==4)
             seq_advance_step();
 
-            // Pulse gate on each step: 50% of current tick duration
-            uint32_t step_us = clock_get_interval_us();
-            io_gate_pulse_us(step_us / 2);
+            // Gate output removed per user request
 
             // Compute and set CV for current step using MCP4822 channel A
             uint32_t cur = seq_current_step();

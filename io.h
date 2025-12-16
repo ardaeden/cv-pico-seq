@@ -14,12 +14,6 @@ void io_blink_led_start();
 // Update LED state - call every loop iteration
 void io_update_led();
 
-// Gate output on GP6: pulse for a step. Duration in microseconds.
-void io_gate_pulse_us(uint64_t duration_us);
-void io_update_gate();
-// Called once per clock tick to advance gate timing when gate is managed in ticks
-void io_gate_tick();
-
 // Initialize rotary encoder (GPIO14=CLK, GPIO15=DATA, GPIO13=SW)
 void io_encoder_init();
 

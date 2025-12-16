@@ -4,7 +4,6 @@
 #include <atomic>
 #include "pico/stdlib.h"
 #include "pico/time.h"
-#include "clock.h"
 
 namespace {
 constexpr uint BUTTON_PIN = 2;            // GP2
@@ -12,13 +11,7 @@ constexpr uint64_t DEBOUNCE_US = 20'000;  // 50 ms debounce window
 constexpr uint LED_PIN = 3;               // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 50'000;  // 50 ms LED on time
 
-constexpr uint GATE_PIN = 6;              // GP6
-constexpr uint64_t DEFAULT_GATE_US = 100'000; // 100 ms gate
 
-// Gate state tracked in ticks for robustness across tempo changes
-bool gate_active = false;
-uint32_t gate_ticks_remaining = 0;
-uint32_t gate_ticks_total = 0;
 
 constexpr uint ENCODER_CLK = 14;          // GP14
 constexpr uint ENCODER_DATA = 15;         // GP15
@@ -54,53 +47,9 @@ void io_init() {
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
 
-    // Gate pin init (default low)
-    gpio_init(GATE_PIN);
-    gpio_set_dir(GATE_PIN, GPIO_OUT);
-    gpio_put(GATE_PIN, false);
 }
 
-void io_gate_init() {
-    gpio_init(GATE_PIN);
-    gpio_set_dir(GATE_PIN, GPIO_OUT);
-    gpio_put(GATE_PIN, false);
-}
-
-void io_gate_pulse_us(uint64_t duration_us) {
-    // If gate already active, ignore retrigger to avoid extending on-time
-    if (gate_active) return;
-
-    // Sanitize duration in us
-    uint64_t dur_us = duration_us ? duration_us : DEFAULT_GATE_US;
-    if (dur_us > 10 * DEFAULT_GATE_US) dur_us = 10 * DEFAULT_GATE_US;
-
-    // Convert requested microsecond duration to ticks based on current clock interval
-    uint32_t tick_us = clock_get_interval_us();
-    if (tick_us == 0) tick_us = 1;
-    uint32_t ticks = (uint32_t)((dur_us + tick_us / 2) / tick_us);
-    if (ticks == 0) ticks = 1;
-
-    // Arm gate in tick units
-    gate_ticks_total = ticks;
-    gate_ticks_remaining = ticks;
-    gpio_put(GATE_PIN, true);
-    gate_active = true;
-}
-
-void io_update_gate() {
-    // Deprecated: kept for compatibility but does nothing when using tick-based gating
-}
-
-void io_gate_tick() {
-    if (!gate_active) return;
-    if (gate_ticks_remaining > 0) {
-        --gate_ticks_remaining;
-    }
-    if (gate_ticks_remaining == 0) {
-        gpio_put(GATE_PIN, false);
-        gate_active = false;
-    }
-}
+// Gate output and functions removed per user request
 
 bool io_poll_play_toggle() {
     bool button_now = gpio_get(BUTTON_PIN);
