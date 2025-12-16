@@ -65,10 +65,18 @@ void io_gate_init() {
 }
 
 void io_gate_pulse_us(uint64_t duration_us) {
+    // If gate already active, ignore retrigger to avoid extending on-time
+    if (gate_active) return;
+
+    // Sanitize duration: use default when zero, and clamp to a reasonable maximum
+    uint64_t dur = duration_us ? duration_us : DEFAULT_GATE_US;
+    // Prevent absurdly long gate compared to default
+    if (dur > 10 * DEFAULT_GATE_US) dur = 10 * DEFAULT_GATE_US;
+
     gpio_put(GATE_PIN, true);
     gate_active = true;
     gate_start_us = time_us_64();
-    gate_duration_us = duration_us ? duration_us : DEFAULT_GATE_US;
+    gate_duration_us = dur;
 }
 
 void io_update_gate() {
