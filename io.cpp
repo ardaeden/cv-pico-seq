@@ -11,8 +11,6 @@ constexpr uint64_t DEBOUNCE_US = 20'000;  // 50 ms debounce window
 constexpr uint LED_PIN = 3;               // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 50'000;  // 50 ms LED on time
 
-
-
 constexpr uint ENCODER_CLK = 14;          // GP14
 constexpr uint ENCODER_DATA = 15;         // GP15
 constexpr uint ENCODER_SW = 13;           // GP13
@@ -46,10 +44,7 @@ void io_init() {
 
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
-
 }
-
-// Gate output and functions removed per user request
 
 bool io_poll_play_toggle() {
     bool button_now = gpio_get(BUTTON_PIN);

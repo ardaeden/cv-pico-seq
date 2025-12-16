@@ -59,6 +59,7 @@ int main() {
 
         if (io_poll_play_toggle()) {
             bool is_playing = seq_toggle_play();
+            clock_gate_enable(is_playing);
             // debug: play toggled
             if (is_playing) {
                 // start without an immediate manual blink; step-aligned blink will indicate activity
@@ -74,7 +75,7 @@ int main() {
             // Advance one step per tick (tick represents 16th note when ppqn==4)
             seq_advance_step();
 
-            // Gate output removed per user request
+            // Gate pulse automatic on GP6 (50% duty, handled by core 1)
 
             // Compute and set CV for current step using MCP4822 channel A
             uint32_t cur = seq_current_step();
