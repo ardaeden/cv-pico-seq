@@ -33,6 +33,7 @@ int main() {
 
     // Core0: sequencer loop consumes tick_flag and advances state
     int encoder_step = 1; // 1 = fine, 10 = coarse
+    uint32_t tick_accum = 0; // accumulate ticks until a full step (ppqn) passes
     while (true) {
         io_update_led();  // non-blocking LED update
         io_update_gate(); // non-blocking gate update
@@ -71,30 +72,33 @@ int main() {
                 continue;
             }
 
-            seq_advance_step();
+            // Accumulate ticks; only advance a sequence step after `ppqn` ticks
+            tick_accum++;
+            uint32_t ppqn = seq_get_ppqn();
+            if (tick_accum >= ppqn) {
+                tick_accum = 0;
+                seq_advance_step();
 
-            // Pulse gate on each step: 50% of current step duration
-            uint32_t step_us = clock_get_interval_us();
-            io_gate_pulse_us(step_us / 2);
+                // Full step duration = tick interval * ppqn
+                uint32_t step_us_total = clock_get_interval_us() * ppqn;
+                // Pulse gate on step: 50% duty cycle of the full step duration
+                io_gate_pulse_us(step_us_total / 2);
 
-            // Compute and set CV for current step using MCP4822 channel A
-            // Use same mapping as example: scaled by NOTE_SF
-            uint32_t cur = seq_current_step();
-            uint16_t dac_val = (uint16_t)((float)cur * NOTE_SF + 0.5f);
-            // clamp
-            if (dac_val > 0x0FFF) dac_val = 0x0FFF;
-            // Use gain=1 to match example semantics (gain=2x hardware selection)
-            mcp4822_set_voltage(0, 1, dac_val);
-            // Update step display (draw steps), then redraw BPM on top so BPM remains visible
-            ui_show_steps(seq_current_step(), seq_get_steps());
-            ui_show_bpm(seq_get_bpm());
+                // Compute and set CV for current step using MCP4822 channel A
+                uint32_t cur = seq_current_step();
+                uint16_t dac_val = (uint16_t)((float)cur * NOTE_SF + 0.5f);
+                if (dac_val > 0x0FFF) dac_val = 0x0FFF;
+                mcp4822_set_voltage(0, 1, dac_val);
 
-            // Blink LED every 4 steps (quarter note)
-            if (seq_current_step() % 4 == 0) {
-                io_blink_led_start();
+                // Update step display (draw steps), then redraw BPM on top so BPM remains visible
+                ui_show_steps(seq_current_step(), seq_get_steps());
+                ui_show_bpm(seq_get_bpm());
+
+                // Blink LED every 4 steps (quarter note)
+                if (seq_current_step() % 4 == 0) {
+                    io_blink_led_start();
+                }
             }
-
-            // TODO: Update CV/Gate outputs here (DAC, GPIO, etc.)
         }
 
         // Non-time-critical work can be done here: read inputs, update BPM, etc.
