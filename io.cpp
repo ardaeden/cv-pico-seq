@@ -7,7 +7,7 @@
 
 namespace {
 constexpr uint BUTTON_PIN = 2;            // GP2
-constexpr uint64_t DEBOUNCE_US = 20'000;  // 50 ms debounce window
+constexpr uint64_t DEBOUNCE_US = 20'000;  // 20 ms debounce window
 constexpr uint LED_PIN = 3;               // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 50'000;  // 50 ms LED on time
 

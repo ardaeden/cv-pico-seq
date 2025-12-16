@@ -37,7 +37,7 @@ bool timer_callback(struct repeating_timer *t) {
         }
     }
     
-    // Check if gate should go LOW (runs every 100us for precise timing)
+    // Check if gate duration elapsed (checked every 100us callback)
     if (gate_active) {
         uint64_t now_us = time_us_64();
         if ((now_us - gate_start_us) >= gate_duration_us) {
