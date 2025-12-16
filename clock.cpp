@@ -41,10 +41,12 @@ void clock_set_bpm(uint32_t bpm) {
     // microseconds per pulse = (60e6 / BPM) / PPQN
     uint64_t us_per_quarter = 60000000ULL / (bpm ? bpm : 120);
     clock_interval_us = static_cast<uint32_t>(us_per_quarter / ppqn);
-    // Reset accumulator to avoid immediate leftover partial interval causing jitter
-    us_counter = 0;
-    // Clear pending ticks so changes apply cleanly
-    tick_count.store(0, std::memory_order_relaxed);
+    // Keep any pending ticks (do not clear tick_count) so gate/steps continue smoothly.
+    // Adjust the microsecond accumulator to fit the new interval so we don't produce
+    // an unexpected immediate tick or long gap: fold accumulator into new interval.
+    if (clock_interval_us > 0) {
+        us_counter = us_counter % clock_interval_us;
+    }
 }
 
 void clock_set_ppqn(uint32_t new_ppqn) {
