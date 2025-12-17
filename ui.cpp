@@ -278,14 +278,14 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
     ssd1306_clear_fb();
     
     // Title
-    ui_draw_text(0, 0, "EDIT STEP");
+    ui_draw_text(0, 0, "STEP SELECT");
     
-    // Step number
+    // Step number (1-16)
     char buf[32];
-    sprintf(buf, "Step: %02d", selected_step);
+    sprintf(buf, "Step: %02d", selected_step + 1);
     ui_draw_text(0, 2, buf);
     
-    // Current note
+    // Current note name
     char note_str[8];
     note_to_string(note, note_str);
     sprintf(buf, "Note: %s", note_str);
@@ -319,22 +319,18 @@ void ui_show_edit_note(uint32_t step, uint8_t note) {
     ssd1306_clear_fb();
     
     // Title
-    ui_draw_text(0, 0, "EDIT NOTE");
+    ui_draw_text(0, 0, "NOTE EDIT");
     
-    // Step number
+    // Step number (1-16)
     char buf[32];
-    sprintf(buf, "Step: %02d", step);
+    sprintf(buf, "Step: %02d", step + 1);
     ui_draw_text(0, 2, buf);
     
-    // Note value (large)
+    // Note name (large)
     char note_str[8];
     note_to_string(note, note_str);
     sprintf(buf, ">> %s <<", note_str);
     ui_draw_text(20, 4, buf);
-    
-    // MIDI number
-    sprintf(buf, "MIDI: %d", note);
-    ui_draw_text(0, 6, buf);
     
     ssd1306_update();
 }
