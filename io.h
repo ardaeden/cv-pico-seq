@@ -11,6 +11,12 @@ bool io_poll_play_toggle();
 // Returns true when edit mode button was pressed (debounced, edge-triggered).
 bool io_poll_edit_toggle();
 
+// Returns true when save button (GP11) was pressed (debounced, edge-triggered).
+bool io_poll_save_button();
+
+// Returns true when load button (GP12) was pressed (debounced, edge-triggered).
+bool io_poll_load_button();
+
 // Start LED blink (non-blocking)
 void io_blink_led_start();
 

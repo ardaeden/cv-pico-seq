@@ -1,8 +1,16 @@
 #include "sequencer.h"
 
 #include <atomic>
+#include <cstring>
+#include "pico/stdlib.h"
 
 namespace {
+// Pattern storage in RAM (10 slots x 16 notes)
+constexpr uint8_t NUM_PATTERN_SLOTS = 10;
+constexpr uint8_t PATTERN_SIZE = 16;  // 16 notes per pattern
+
+uint8_t pattern_storage[NUM_PATTERN_SLOTS][PATTERN_SIZE] = {0};
+
 struct SequencerState {
     uint32_t bpm;
     uint32_t ppqn;
@@ -72,4 +80,26 @@ void seq_set_note(uint32_t step, uint8_t note) {
     if (step >= 16) return;
     if (note > 127) note = 127;
     state.notes[step] = note;
+}
+
+void seq_init_flash() {
+    // Initialize all pattern slots with default C major scale (C3-B4)
+    uint8_t default_pattern[16] = {48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74};
+    for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
+        memcpy(pattern_storage[i], default_pattern, PATTERN_SIZE);
+    }
+}
+
+void seq_save_pattern(uint8_t slot) {
+    if (slot >= NUM_PATTERN_SLOTS) return;
+    
+    // Save current notes to RAM slot
+    memcpy(pattern_storage[slot], state.notes, PATTERN_SIZE);
+}
+
+void seq_load_pattern(uint8_t slot) {
+    if (slot >= NUM_PATTERN_SLOTS) return;
+    
+    // Load pattern from RAM slot
+    memcpy(state.notes, pattern_storage[slot], PATTERN_SIZE);
 }

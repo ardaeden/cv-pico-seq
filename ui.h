@@ -8,8 +8,8 @@ void ui_init();
 // Clear display framebuffer
 void ui_clear();
 
-// Immediately update displayed BPM value (non-blocking)
-void ui_show_bpm(uint32_t bpm);
+// Immediately update displayed BPM value and pattern slot (non-blocking)
+void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot);
 
 // Display 16-step grid (current_step in [0..steps-1]).
 // Shows 8 squares on top row and 8 on bottom; fills the current step square.
@@ -20,3 +20,6 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note);
 
 // Display edit mode: note editing
 void ui_show_edit_note(uint32_t step, uint8_t note);
+
+// Display pattern select mode (slot 0-9)
+void ui_show_pattern_select(uint8_t slot);

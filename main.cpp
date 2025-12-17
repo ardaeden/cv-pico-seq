@@ -9,6 +9,7 @@ int main() {
     io_init();
     io_encoder_init();
     seq_init();
+    seq_init_flash();  // Initialize pattern storage with default patterns
 
     // Configure clock core using current BPM and PPQN
     clock_set_bpm(seq_get_bpm());
@@ -16,20 +17,21 @@ int main() {
 
     // Initialize display UI (if present)
     ui_init();
-    ui_show_bpm(seq_get_bpm());
+    ui_show_bpm(seq_get_bpm(), 0);
     // Draw step grid with no highlight on boot (step 16 is invalid/none)
     ui_show_steps(16, seq_get_steps());
 
-    // MIDI to CV conversion: 1V/octave, C1 (MIDI 36) = 0V reference
+    // MIDI to CV conversion: 1V/octave, C2 (MIDI 36) = 0V reference
     // 4 octaves = 48 semitones = 4096 DAC units
     // DAC per semitone = 4096 / 48 = 85.333...
-    constexpr uint8_t MIDI_BASE = 36;  // C1 as 0V
+    constexpr uint8_t MIDI_BASE = 36;  // C2 as 0V
     constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
 
     // Edit mode state
-    enum EditMode { EDIT_NONE, EDIT_SELECT_STEP, EDIT_NOTE };
+    enum EditMode { EDIT_NONE, EDIT_SELECT_STEP, EDIT_NOTE, PATTERN_SELECT };
     EditMode edit_mode = EDIT_NONE;
     uint32_t edit_step = 0;
+    uint8_t pattern_slot = 0;  // Current pattern slot (0-9)
     
     int encoder_step = 1; // 1 = fine, 10 = coarse (for BPM)
     while (true) {
@@ -44,24 +46,28 @@ int main() {
             if (is_playing && edit_mode != EDIT_NONE) {
                 edit_mode = EDIT_NONE;
                 ui_clear();
-                ui_show_bpm(seq_get_bpm());
+                ui_show_bpm(seq_get_bpm(), pattern_slot);
                 ui_show_steps(16, seq_get_steps());
             }
         }
 
-        // Edit button: toggle edit mode (only when stopped)
+        // Edit button: cycle through modes (only when stopped)
         if (io_poll_edit_toggle()) {
             if (!seq_is_playing()) {
                 if (edit_mode == EDIT_NONE) {
-                    // Enter edit mode
+                    // Enter step edit mode
                     edit_mode = EDIT_SELECT_STEP;
                     edit_step = 0;
                     ui_show_edit_step(edit_step, seq_get_note(edit_step));
-                } else {
-                    // Exit edit mode
+                } else if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE) {
+                    // Enter pattern select mode
+                    edit_mode = PATTERN_SELECT;
+                    ui_show_pattern_select(pattern_slot);
+                } else if (edit_mode == PATTERN_SELECT) {
+                    // Return to normal mode
                     edit_mode = EDIT_NONE;
                     ui_clear();
-                    ui_show_bpm(seq_get_bpm());
+                    ui_show_bpm(seq_get_bpm(), pattern_slot);
                     ui_show_steps(16, seq_get_steps());
                 }
             }
@@ -95,13 +101,21 @@ int main() {
                 ui_show_edit_step(edit_step, seq_get_note(edit_step));
                 
             } else if (edit_mode == EDIT_NOTE) {
-                // Change note value
+                // Change note value (limit to CV range: C2-C6, MIDI 36-84)
                 uint8_t current_note = seq_get_note(edit_step);
                 int new_note = (int)current_note + encoder_delta;
-                if (new_note < 0) new_note = 0;
-                if (new_note > 127) new_note = 127;
+                if (new_note < 36) new_note = 36;   // C2
+                if (new_note > 84) new_note = 84;   // C6
                 seq_set_note(edit_step, (uint8_t)new_note);
                 ui_show_edit_note(edit_step, (uint8_t)new_note);
+                
+            } else if (edit_mode == PATTERN_SELECT) {
+                // Change pattern slot
+                int new_slot = (int)pattern_slot + encoder_delta;
+                if (new_slot < 0) new_slot = 0;
+                if (new_slot > 9) new_slot = 9;
+                pattern_slot = (uint8_t)new_slot;
+                ui_show_pattern_select(pattern_slot);
                 
             } else {
                 // Playing mode: change BPM
@@ -112,7 +126,29 @@ int main() {
                 
                 seq_set_bpm((uint32_t)new_bpm);
                 clock_set_bpm((uint32_t)new_bpm);
-                ui_show_bpm((uint32_t)new_bpm);
+                ui_show_bpm((uint32_t)new_bpm, pattern_slot);
+            }
+        }
+
+        // Save/Load button handling (only in pattern select mode)
+        if (edit_mode == PATTERN_SELECT) {
+            if (io_poll_save_button()) {
+                seq_save_pattern(pattern_slot);
+                io_blink_led_start();  // Visual feedback
+                // Return to normal mode after save
+                edit_mode = EDIT_NONE;
+                ui_clear();
+                ui_show_bpm(seq_get_bpm(), pattern_slot);
+                ui_show_steps(16, seq_get_steps());
+            }
+            if (io_poll_load_button()) {
+                seq_load_pattern(pattern_slot);
+                io_blink_led_start();  // Visual feedback
+                // Return to normal mode after load
+                edit_mode = EDIT_NONE;
+                ui_clear();
+                ui_show_bpm(seq_get_bpm(), pattern_slot);
+                ui_show_steps(16, seq_get_steps());
             }
         }
 
@@ -142,7 +178,7 @@ int main() {
 
             // Update step display (draw steps), then redraw BPM on top so BPM remains visible
             ui_show_steps(seq_current_step(), seq_get_steps());
-            ui_show_bpm(seq_get_bpm());
+            ui_show_bpm(seq_get_bpm(), pattern_slot);
 
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {

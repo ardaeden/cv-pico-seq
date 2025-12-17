@@ -8,7 +8,9 @@
 namespace {
 constexpr uint BUTTON_PIN = 2;            // GP2 - Play button
 constexpr uint EDIT_BUTTON_PIN = 10;      // GP10 - Edit mode button
-constexpr uint64_t DEBOUNCE_US = 20'000;  // 20 ms debounce window
+constexpr uint SAVE_BUTTON_PIN = 11;      // GP11 - Save pattern button
+constexpr uint LOAD_BUTTON_PIN = 12;      // GP12 - Load pattern button
+constexpr uint64_t DEBOUNCE_US = 50'000;  // 50 ms debounce window
 constexpr uint LED_PIN = 3;               // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 50'000;  // 50 ms LED on time
 
@@ -21,6 +23,12 @@ uint64_t last_button_event_us = 0;     // last time we toggled play state
 
 bool edit_button_prev = true;          // edit button starts high (pull-up)
 uint64_t last_edit_button_event_us = 0;
+
+bool save_button_prev = true;          // save button starts high (pull-up)
+uint64_t last_save_button_event_us = 0;
+
+bool load_button_prev = true;          // load button starts high (pull-up)
+uint64_t last_load_button_event_us = 0;
 
 // Encoder switch debounce
 bool encoder_sw_prev = true;
@@ -50,6 +58,14 @@ void io_init() {
     gpio_set_dir(EDIT_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(EDIT_BUTTON_PIN);
 
+    gpio_init(SAVE_BUTTON_PIN);
+    gpio_set_dir(SAVE_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(SAVE_BUTTON_PIN);
+
+    gpio_init(LOAD_BUTTON_PIN);
+    gpio_set_dir(LOAD_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(LOAD_BUTTON_PIN);
+
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
 }
@@ -73,6 +89,32 @@ bool io_poll_edit_toggle() {
     if (button_now != edit_button_prev && (now_us - last_edit_button_event_us) >= DEBOUNCE_US) {
         edit_button_prev = button_now;
         last_edit_button_event_us = now_us;
+        if (!button_now) { // active-low press
+            return true;
+        }
+    }
+    return false;
+}
+
+bool io_poll_save_button() {
+    bool button_now = gpio_get(SAVE_BUTTON_PIN);
+    uint64_t now_us = time_us_64();
+    if (button_now != save_button_prev && (now_us - last_save_button_event_us) >= DEBOUNCE_US) {
+        save_button_prev = button_now;
+        last_save_button_event_us = now_us;
+        if (!button_now) { // active-low press
+            return true;
+        }
+    }
+    return false;
+}
+
+bool io_poll_load_button() {
+    bool button_now = gpio_get(LOAD_BUTTON_PIN);
+    uint64_t now_us = time_us_64();
+    if (button_now != load_button_prev && (now_us - last_load_button_event_us) >= DEBOUNCE_US) {
+        load_button_prev = button_now;
+        last_load_button_event_us = now_us;
         if (!button_now) { // active-low press
             return true;
         }

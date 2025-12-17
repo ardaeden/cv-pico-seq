@@ -195,33 +195,40 @@ void ui_clear() {
     ssd1306_update();
 }
 
-void ui_show_bpm(uint32_t bpm) {
+void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot) {
     char numbuf[16];
     int numlen = snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
     if (numlen <= 0) return;
     
-    // Larger BPM display at top-left using 2 pages (double height)
-    // Clear pages 0 and 1 for BPM area
-    for (int i = 0; i < 64; ++i) {
+    // Larger BPM display at top-left using 2x scale
+    // Clear entire top area for BPM (2 pages height, full width)
+    for (int i = 0; i < 128; ++i) {
         fb[0 * 128 + i] = 0x00;
         fb[1 * 128 + i] = 0x00;
     }
     
     int x = 0;
-    // Draw label "BPM:" on both pages for double height
+    // Draw label "BPM:" with 2x scale
     const char *label = "BPM:";
     for (const char *p = label; *p; ++p) {
-        ui_draw_char(x, 0, *p);
-        ui_draw_char(x, 1, *p);
-        x += 6;
+        draw_scaled_char(x, 0, *p, 2);
+        x += 12;  // 5*2 + 2 spacing
     }
-    // Small gap before number
-    // Draw BPM number on both pages for double height
+    // Draw BPM number with 2x scale
     for (int i = 0; i < numlen; ++i) {
-        ui_draw_char(x, 0, numbuf[i]);
-        ui_draw_char(x, 1, numbuf[i]);
-        x += 6;
+        draw_scaled_char(x, 0, numbuf[i], 2);
+        x += 12;
     }
+    
+    // Draw pattern slot on right side (P:0-9)
+    char slot_buf[8];
+    snprintf(slot_buf, sizeof(slot_buf), "P:%d", pattern_slot);
+    int slot_x = 128 - (strlen(slot_buf) * 12);  // Right align
+    for (const char *p = slot_buf; *p; ++p) {
+        draw_scaled_char(slot_x, 0, *p, 2);
+        slot_x += 12;
+    }
+    
     ssd1306_update();
 }
 
@@ -298,7 +305,7 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
 // Helper: Convert MIDI note to name (e.g., 48 -> "C3")
 static void note_to_string(uint8_t note, char *buf) {
     const char *notes[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-    int octave = (note / 12) - 1;
+    int octave = (note / 12) - 1;  // MIDI: C-1=0, C0=12, C1=24, C2=36, C3=48, etc.
     int semitone = note % 12;
     sprintf(buf, "%s%d", notes[semitone], octave);
 }
@@ -360,6 +367,23 @@ void ui_show_edit_note(uint32_t step, uint8_t note) {
     note_to_string(note, note_str);
     sprintf(buf, ">> %s <<", note_str);
     ui_draw_text(20, 4, buf);
+    
+    ssd1306_update();
+}
+
+void ui_show_pattern_select(uint8_t slot) {
+    ssd1306_clear_fb();
+    
+    // Title
+    ui_draw_text(16, 0, "PATTERN SELECT");
+    
+    // Current slot number (large, centered)
+    char buf[32];
+    sprintf(buf, "Slot: %d", slot);
+    ui_draw_text(30, 3, buf);
+    
+    // Instructions
+    ui_draw_text(0, 6, "GP11=Save GP12=Load");
     
     ssd1306_update();
 }

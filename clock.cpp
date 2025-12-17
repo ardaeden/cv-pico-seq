@@ -97,10 +97,6 @@ bool clock_consume_tick() {
     return true;
 }
 
-uint32_t clock_get_interval_us() {
-    return clock_interval_us;
-}
-
 void clock_gate_enable(bool enable) {
     gate_enabled = enable;
     if (!enable && gate_active) {

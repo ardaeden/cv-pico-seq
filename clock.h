@@ -11,9 +11,6 @@ void clock_launch_core1();
 // Check and clear a pending tick produced by core1.
 bool clock_consume_tick();
 
-// Return the current clock interval in microseconds (microseconds per tick).
-uint32_t clock_get_interval_us();
-
 // Enable/disable gate output (call when play/pause)
 void clock_gate_enable(bool enable);
 
