@@ -199,19 +199,27 @@ void ui_show_bpm(uint32_t bpm) {
     char numbuf[16];
     int numlen = snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
     if (numlen <= 0) return;
-    // Small BPM display at top-left using 5x7 font
-    // Erase only page 0 area where BPM is displayed (do not clear whole fb)
-    for (int i = 0; i < 128; ++i) fb[0 * 128 + i] = 0x00;
+    
+    // Larger BPM display at top-left using 2 pages (double height)
+    // Clear pages 0 and 1 for BPM area
+    for (int i = 0; i < 64; ++i) {
+        fb[0 * 128 + i] = 0x00;
+        fb[1 * 128 + i] = 0x00;
+    }
+    
     int x = 0;
-    // Draw label "BPM:" (font contains B, P, M and ':')
+    // Draw label "BPM:" on both pages for double height
     const char *label = "BPM:";
     for (const char *p = label; *p; ++p) {
         ui_draw_char(x, 0, *p);
+        ui_draw_char(x, 1, *p);
         x += 6;
     }
-    // Small gap before number (already accounted by char spacing)
+    // Small gap before number
+    // Draw BPM number on both pages for double height
     for (int i = 0; i < numlen; ++i) {
         ui_draw_char(x, 0, numbuf[i]);
+        ui_draw_char(x, 1, numbuf[i]);
         x += 6;
     }
     ssd1306_update();
@@ -261,8 +269,9 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
     const int cols = 8;
     const int total_w = cols * sq + (cols - 1) * spacing; // 124
     const int left = (128 - total_w) / 2;
-    const int top_y = 20;
-    const int bottom_y = top_y + sq + 8;
+    // Move to bottom: screen is 64 pixels high, 2 rows of squares with gap
+    const int bottom_y = 64 - sq;  // Bottom row at very bottom
+    const int top_y = bottom_y - sq - 8;  // Top row above with 8px gap
 
     // Clear grid area
     clear_region(left - 1, top_y - 1, total_w + 2, (sq * 2) + 8 + 2);
