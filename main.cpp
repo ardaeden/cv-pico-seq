@@ -18,8 +18,8 @@ int main() {
     // Initialize display UI (if present)
     ui_init();
     ui_show_bpm(seq_get_bpm());
-    // Draw step grid immediately on boot so boxes are visible before playback
-    ui_show_steps(seq_current_step(), seq_get_steps());
+    // Draw step grid with no highlight on boot (step 16 is invalid/none)
+    ui_show_steps(16, seq_get_steps());
 
     // MIDI to CV conversion: 1V/octave, C1 (MIDI 36) = 0V reference
     // 4 octaves = 48 semitones = 4096 DAC units

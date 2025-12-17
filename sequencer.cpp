@@ -13,7 +13,7 @@ struct SequencerState {
 };
 
 // Default: C major scale starting from C3 (MIDI 48)
-static SequencerState state = {120, 4, 16, 0, false, 
+static SequencerState state = {120, 4, 16, 15, false, 
     {48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74}};
 } // namespace
 
@@ -21,7 +21,7 @@ void seq_init() {
     state.bpm = 120;
     state.ppqn = 4;  // 4 pulses per quarter note for 16th notes per step
     state.steps = 16;
-    state.current_step = 0;
+    state.current_step = 15;  // Start at 15 so first tick moves to step 0
     state.playing.store(false);
 }
 
@@ -32,12 +32,9 @@ bool seq_toggle_play() {
         // expected is updated by compare_exchange_weak on failure
     }
     bool is_playing = !expected;
-    if (is_playing) {
-        // When starting playback, set current_step to the previous step
-        // so the first advance moves to step 0 (first step).
-        state.current_step = state.steps ? (state.steps - 1) : 15;
-    } else {
-        state.current_step = 0; // reset to first step when paused
+    if (!is_playing) {
+        // Reset to step 15 so next play starts at 0 after first tick
+        state.current_step = 15;
     }
     return is_playing;
 }

@@ -21,8 +21,6 @@ volatile bool gate_enabled = false;
 
 // DAC/CV control (managed by core1)
 constexpr uint DAC_CS_PIN = 17;
-volatile uint16_t dac_value = 0;
-volatile bool dac_update_pending = false;
 
 struct repeating_timer timer_state;
 
@@ -32,7 +30,7 @@ bool timer_callback(struct repeating_timer *t) {
 
     if (us_counter >= clock_interval_us) {
         us_counter = 0;
-        tick_flag = true; // notify core0 of a timing tick
+        tick_flag = true;
         
         // Start gate automatically on each tick (50% duty cycle) - only when enabled
         if (gate_enabled && !gate_active) {
@@ -113,6 +111,18 @@ void clock_gate_enable(bool enable) {
 }
 
 void clock_set_cv(uint16_t dac_val) {
-    dac_value = dac_val;
-    dac_update_pending = true;
+    // Disable interrupts to safely write to SPI from core 0
+    uint32_t save = save_and_disable_interrupts();
+    
+    if (dac_val > 0x0FFF) dac_val = 0x0FFF;
+    
+    // Build MCP4822 command: channel A, 2X gain, active
+    uint16_t command = 0x1000 | (dac_val & 0x0FFF);
+    uint8_t buf[2] = {(uint8_t)(command >> 8), (uint8_t)(command & 0xFF)};
+    
+    gpio_put(DAC_CS_PIN, false);
+    spi_write_blocking(spi0, buf, 2);
+    gpio_put(DAC_CS_PIN, true);
+    
+    restore_interrupts(save);
 }
