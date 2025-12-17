@@ -59,10 +59,6 @@ void seq_set_bpm(uint32_t new_bpm) {
     state.bpm = new_bpm ? new_bpm : 120;
 }
 
-uint32_t seq_get_ppqn() {
-    return state.ppqn;
-}
-
 uint32_t seq_get_steps() {
     return state.steps;
 }

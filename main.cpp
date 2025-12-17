@@ -4,7 +4,6 @@
 #include "io.h"
 #include "sequencer.h"
 #include "ui.h"
-#include "mcp4822.h"
 
 int main() {
     io_init();

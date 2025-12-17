@@ -23,7 +23,6 @@ add_executable(${CMAKE_PROJECT_NAME}
     io.cpp
     sequencer.cpp
     ui.cpp
-    mcp4822.cpp
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} 
@@ -36,14 +35,11 @@ target_link_libraries(${CMAKE_PROJECT_NAME} hardware_spi)
 
 add_compile_definitions(PICO_DISABLE_SPI=0)
 
+# Enable USB reset interface for picotool reboot capability (must be before pico_enable_stdio_usb)
+add_compile_definitions(PICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=1)
 
 pico_enable_stdio_usb(${CMAKE_PROJECT_NAME} 1)
 pico_enable_stdio_uart(${CMAKE_PROJECT_NAME} 0)
-
-# Enable USB reset interface for picotool reboot capability
-target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    PICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=1
-)
 
 pico_add_extra_outputs(${CMAKE_PROJECT_NAME})
 
