@@ -154,6 +154,13 @@ static void set_pixel(int x, int y) {
     fb[page * 128 + x] |= (1u << bit);
 }
 
+static void clear_pixel(int x, int y) {
+    if (x < 0 || x >= 128 || y < 0 || y >= 64) return;
+    int page = y >> 3;
+    int bit = y & 7;
+    fb[page * 128 + x] &= ~(1u << bit);
+}
+
 static void draw_scaled_char(int x0, int y0, char c, int scale) {
     int idx = char_to_font_index(c);
     const uint8_t *glyph = font5x7[idx];
@@ -194,12 +201,98 @@ void ui_init() {
     ssd1306_update();
 }
 
+void ui_boot_animation() {
+    // Sequencer-style wave animation: 16 steps fill in, then pulse
+    const int sq = 12;
+    const int spacing = 4;
+    
+    // Phase 1: Steps fill in sequentially (like sequencer ticks)
+    for (int step = 0; step < 16; step++) {
+        ssd1306_clear_fb();
+        
+        // Draw all steps up to current
+        for (int i = 0; i <= step; i++) {
+            int row = (i < 8) ? 0 : 1;
+            int col = i % 8;
+            
+            int bottom_y = 64 - sq;
+            int top_y = bottom_y - sq - 8;
+            int step_y = (row == 0) ? top_y : bottom_y;
+            int x = col * (sq + spacing);
+            
+            // Fill square
+            for (int dy = 0; dy < sq; dy++) {
+                int y = step_y + dy;
+                int page = y / 8;
+                int bit = y % 8;
+                for (int dx = 0; dx < sq; dx++) {
+                    if (page < 8 && x + dx < 128) {
+                        fb[page * 128 + x + dx] |= (1 << bit);
+                    }
+                }
+            }
+        }
+        
+        ssd1306_update();
+        sleep_ms(70);
+    }
+    
+    // Phase 2: Pulsing effect - all squares pulse 3 times
+    for (int pulse = 0; pulse < 3; pulse++) {
+        // Fill all
+        ssd1306_clear_fb();
+        for (int step = 0; step < 16; step++) {
+            int row = (step < 8) ? 0 : 1;
+            int col = step % 8;
+            
+            int bottom_y = 64 - sq;
+            int top_y = bottom_y - sq - 8;
+            int step_y = (row == 0) ? top_y : bottom_y;
+            int x = col * (sq + spacing);
+            
+            for (int dy = 0; dy < sq; dy++) {
+                int y = step_y + dy;
+                int page = y / 8;
+                int bit = y % 8;
+                for (int dx = 0; dx < sq; dx++) {
+                    if (page < 8 && x + dx < 128) {
+                        fb[page * 128 + x + dx] |= (1 << bit);
+                    }
+                }
+            }
+        }
+        ssd1306_update();
+        sleep_ms(150);
+        
+        // Clear all
+        ssd1306_clear_fb();
+        ssd1306_update();
+        sleep_ms(150);
+    }
+    
+    // Phase 3: "CV-PICO-SEQ" text fade in
+    ssd1306_clear_fb();
+    const char* text = "CV-PICO-SEQ";
+    int text_len = 11;
+    int char_width = 6;
+    int start_x = (128 - (text_len * char_width)) / 2;
+    
+    for (int i = 0; i < text_len; i++) {
+        ui_draw_char(start_x + i * char_width, 3, text[i]);
+    }
+    ssd1306_update();
+    sleep_ms(400);
+    
+    ssd1306_clear_fb();
+    ssd1306_update();
+}
+
 void ui_clear() {
     ssd1306_clear_fb();
     ssd1306_update();
 }
 
-void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot) {
+void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, bool blink_slot) {
     char numbuf[16];
     int numlen = snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
     if (numlen <= 0) return;
@@ -224,13 +317,15 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot) {
         x += 12;
     }
     
-    // Draw pattern slot on right side (P:0-9)
-    char slot_buf[8];
-    snprintf(slot_buf, sizeof(slot_buf), "P:%d", pattern_slot);
-    int slot_x = 128 - (strlen(slot_buf) * 12);  // Right align
-    for (const char *p = slot_buf; *p; ++p) {
-        draw_scaled_char(slot_x, 0, *p, 2);
-        slot_x += 12;
+    // Draw pattern slot on right side (P:0-9) - skip if blinking
+    if (!blink_slot) {
+        char slot_buf[8];
+        snprintf(slot_buf, sizeof(slot_buf), "P:%d", pattern_slot);
+        int slot_x = 128 - (strlen(slot_buf) * 12);  // Right align
+        for (const char *p = slot_buf; *p; ++p) {
+            draw_scaled_char(slot_x, 0, *p, 2);
+            slot_x += 12;
+        }
     }
     
     ssd1306_update();
@@ -273,6 +368,25 @@ static void fill_rect(int x0, int y0, int w, int h) {
     }
 }
 
+// Draw a small filled circle (3x3 pixels)
+static void draw_small_circle(int cx, int cy) {
+    // Simple 3x3 circle pattern
+    set_pixel(cx, cy - 1);
+    set_pixel(cx - 1, cy);
+    set_pixel(cx, cy);
+    set_pixel(cx + 1, cy);
+    set_pixel(cx, cy + 1);
+}
+
+// Draw a small filled circle with inverse (clear pixels instead of set)
+static void draw_small_circle_inverse(int cx, int cy) {
+    clear_pixel(cx, cy - 1);
+    clear_pixel(cx - 1, cy);
+    clear_pixel(cx, cy);
+    clear_pixel(cx + 1, cy);
+    clear_pixel(cx, cy + 1);
+}
+
 void ui_show_steps(uint32_t current_step, uint32_t steps) {
     if (steps == 0) return;
     const int sq = 12;
@@ -292,15 +406,28 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
         int row = i / cols;
         int x = left + col * (sq + spacing);
         int y = (row == 0) ? top_y : bottom_y;
-        draw_rect_outline(x, y, sq, sq);
-    }
-
-    if (current_step < steps && current_step < 16) {
-        int col = current_step % cols;
-        int row = current_step / cols;
-        int x = left + col * (sq + spacing);
-        int y = (row == 0) ? top_y : bottom_y;
-        fill_rect(x + 2, y + 2, sq - 4, sq - 4);
+        
+        bool is_current = (i == (int)current_step && current_step < steps);
+        bool gate_enabled = seq_get_gate_enabled(i);
+        
+        if (is_current) {
+            fill_rect(x + 2, y + 2, sq - 4, sq - 4);
+        } else {
+            draw_rect_outline(x, y, sq, sq);
+        }
+        
+        // Draw gate indicator circle
+        if (gate_enabled) {
+            int cx = x + sq / 2;
+            int cy = y + sq / 2;
+            if (is_current) {
+                // Inverse circle for current step
+                draw_small_circle_inverse(cx, cy);
+            } else {
+                // Normal circle for other steps
+                draw_small_circle(cx, cy);
+            }
+        }
     }
 
     ssd1306_update();
@@ -320,40 +447,48 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
     // Title
     ui_draw_text(0, 0, "STEP SELECT");
     
-    // Step number (1-16)
+    // Step and Note on same line
     char buf[32];
-    sprintf(buf, "Step: %02d", selected_step + 1);
-    ui_draw_text(0, 2, buf);
-    
-    // Current note name
     char note_str[8];
     note_to_string(note, note_str);
-    sprintf(buf, "Note: %s", note_str);
-    ui_draw_text(0, 4, buf);
+    sprintf(buf, "Step:%02d  Note:%s", selected_step + 1, note_str);
+    ui_draw_text(0, 2, buf);
     
-    // Gate status
-    bool gate_on = seq_get_gate_enabled(selected_step);
-    sprintf(buf, "Gate: %s", gate_on ? "ON" : "OFF");
-    ui_draw_text(0, 6, buf);
-    
-    // Draw step grid with highlight
+    // Draw step grid with highlight and gate indicators (larger squares)
     const int cols = 8;
-    const int sq = 8;
-    const int spacing = 6;
-    const int total_w = cols * (sq + spacing) - spacing;
+    const int sq = 12;
+    const int spacing = 4;
+    const int total_w = cols * sq + (cols - 1) * spacing;
     const int left = (128 - total_w) / 2;
-    const int y = 50;
+    const int bottom_y = 64 - sq;
+    const int top_y = bottom_y - sq - 8;
     
     for (int i = 0; i < 16; ++i) {
         int col = i % cols;
         int row = i / cols;
         int x = left + col * (sq + spacing);
-        int step_y = y + row * 8;
+        int step_y = (row == 0) ? top_y : bottom_y;
         
-        if (i == (int)selected_step) {
-            fill_rect(x, step_y, sq, 6);
+        bool is_selected = (i == (int)selected_step);
+        bool gate_enabled = seq_get_gate_enabled(i);
+        
+        if (is_selected) {
+            fill_rect(x + 2, step_y + 2, sq - 4, sq - 4);
         } else {
-            draw_rect_outline(x, step_y, sq, 6);
+            draw_rect_outline(x, step_y, sq, sq);
+        }
+        
+        // Draw circle if gate is enabled
+        if (gate_enabled) {
+            int cx = x + sq / 2;
+            int cy = step_y + sq / 2;
+            if (is_selected) {
+                // Inverse circle for selected step (white on black)
+                draw_small_circle_inverse(cx, cy);
+            } else {
+                // Normal circle for unselected step (black on white)
+                draw_small_circle(cx, cy);
+            }
         }
     }
     

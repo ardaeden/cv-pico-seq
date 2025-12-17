@@ -31,5 +31,3 @@ int io_encoder_poll_delta();
 
 // Encoder switch (button) press - debounced edge (active-low)
 bool io_encoder_button_pressed();
-
-// (no suppression APIs; LED blink controlled by main loop)
