@@ -114,6 +114,15 @@ static void ui_draw_char(int x, int page, char c) {
     dst[5] = 0x00;
 }
 
+static void ui_draw_text(int x, int page, const char *str) {
+    int pos = x;
+    while (*str) {
+        ui_draw_char(pos, page, *str);
+        pos += 6;
+        str++;
+    }
+}
+
 static void set_pixel(int x, int y) {
     if (x < 0 || x >= 128 || y < 0 || y >= 64) return;
     int page = y >> 3;
@@ -249,5 +258,78 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
         fill_rect(x + 2, y + 2, sq - 4, sq - 4);
     }
 
+    ssd1306_update();
+}
+
+// Helper: Convert MIDI note to name (e.g., 48 -> "C3")
+static void note_to_string(uint8_t note, char *buf) {
+    const char *notes[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    int octave = (note / 12) - 1;
+    int semitone = note % 12;
+    sprintf(buf, "%s%d", notes[semitone], octave);
+}
+
+void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
+    ssd1306_clear_fb();
+    
+    // Title
+    ui_draw_text(0, 0, "EDIT STEP");
+    
+    // Step number
+    char buf[32];
+    sprintf(buf, "Step: %02d", selected_step);
+    ui_draw_text(0, 2, buf);
+    
+    // Current note
+    char note_str[8];
+    note_to_string(note, note_str);
+    sprintf(buf, "Note: %s", note_str);
+    ui_draw_text(0, 4, buf);
+    
+    // Draw step grid with highlight
+    const int cols = 8;
+    const int sq = 8;
+    const int spacing = 6;
+    const int total_w = cols * (sq + spacing) - spacing;
+    const int left = (128 - total_w) / 2;
+    const int y = 50;
+    
+    for (int i = 0; i < 16; ++i) {
+        int col = i % cols;
+        int row = i / cols;
+        int x = left + col * (sq + spacing);
+        int step_y = y + row * 8;
+        
+        if (i == (int)selected_step) {
+            fill_rect(x, step_y, sq, 6);
+        } else {
+            draw_rect_outline(x, step_y, sq, 6);
+        }
+    }
+    
+    ssd1306_update();
+}
+
+void ui_show_edit_note(uint32_t step, uint8_t note) {
+    ssd1306_clear_fb();
+    
+    // Title
+    ui_draw_text(0, 0, "EDIT NOTE");
+    
+    // Step number
+    char buf[32];
+    sprintf(buf, "Step: %02d", step);
+    ui_draw_text(0, 2, buf);
+    
+    // Note value (large)
+    char note_str[8];
+    note_to_string(note, note_str);
+    sprintf(buf, ">> %s <<", note_str);
+    ui_draw_text(20, 4, buf);
+    
+    // MIDI number
+    sprintf(buf, "MIDI: %d", note);
+    ui_draw_text(0, 6, buf);
+    
     ssd1306_update();
 }

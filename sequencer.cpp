@@ -14,7 +14,7 @@ struct SequencerState {
 
 // Default: C major scale starting from C3 (MIDI 48)
 static SequencerState state = {120, 4, 16, 15, false, 
-    {48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74}};
+    {48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74}};
 } // namespace
 
 void seq_init() {

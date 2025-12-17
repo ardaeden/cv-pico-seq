@@ -26,32 +26,79 @@ int main() {
     constexpr uint8_t MIDI_BASE = 36;  // C1 as 0V
     constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
 
-    int encoder_step = 1; // 1 = fine, 10 = coarse
+    // Edit mode state
+    enum EditMode { EDIT_NONE, EDIT_SELECT_STEP, EDIT_NOTE };
+    EditMode edit_mode = EDIT_NONE;
+    uint32_t edit_step = 0;
+    
+    int encoder_step = 1; // 1 = fine, 10 = coarse (for BPM)
     while (true) {
         io_update_led();  // non-blocking LED update
 
-        // Encoder button toggles fine/coarse step
-        if (io_encoder_button_pressed()) {
-            encoder_step = (encoder_step == 1) ? 10 : 1;
-        }
-
-        // Poll encoder for BPM changes
-        int encoder_delta = io_encoder_poll_delta();
-        if (encoder_delta != 0) {
-            uint32_t current_bpm = seq_get_bpm();
-            int new_bpm = (int)current_bpm + encoder_delta * encoder_step;
-            // Clamp BPM between 20 and 300
-            if (new_bpm < 20) new_bpm = 20;
-            if (new_bpm > 300) new_bpm = 300;
-            
-            seq_set_bpm((uint32_t)new_bpm);
-            clock_set_bpm((uint32_t)new_bpm);
-            ui_show_bpm((uint32_t)new_bpm);
-        }
-
+        // Play button handling
         if (io_poll_play_toggle()) {
             bool is_playing = seq_toggle_play();
             clock_gate_enable(is_playing);
+            
+            // Enter/exit edit mode
+            if (!is_playing) {
+                edit_mode = EDIT_SELECT_STEP;
+                edit_step = 0;
+                ui_show_edit_step(edit_step, seq_get_note(edit_step));
+            } else {
+                edit_mode = EDIT_NONE;
+                ui_show_bpm(seq_get_bpm());
+                ui_show_steps(16, seq_get_steps());
+            }
+        }
+
+        // Encoder switch handling
+        if (io_encoder_button_pressed()) {
+            if (edit_mode == EDIT_SELECT_STEP) {
+                // Enter note edit mode
+                edit_mode = EDIT_NOTE;
+                ui_show_edit_note(edit_step, seq_get_note(edit_step));
+            } else if (edit_mode == EDIT_NOTE) {
+                // Return to step select mode
+                edit_mode = EDIT_SELECT_STEP;
+                ui_show_edit_step(edit_step, seq_get_note(edit_step));
+            } else {
+                // Playing mode: toggle fine/coarse BPM
+                encoder_step = (encoder_step == 1) ? 10 : 1;
+            }
+        }
+
+        // Encoder rotation handling
+        int encoder_delta = io_encoder_poll_delta();
+        if (encoder_delta != 0) {
+            if (edit_mode == EDIT_SELECT_STEP) {
+                // Change selected step
+                int new_step = (int)edit_step + encoder_delta;
+                if (new_step < 0) new_step = 0;
+                if (new_step > 15) new_step = 15;
+                edit_step = (uint32_t)new_step;
+                ui_show_edit_step(edit_step, seq_get_note(edit_step));
+                
+            } else if (edit_mode == EDIT_NOTE) {
+                // Change note value
+                uint8_t current_note = seq_get_note(edit_step);
+                int new_note = (int)current_note + encoder_delta;
+                if (new_note < 0) new_note = 0;
+                if (new_note > 127) new_note = 127;
+                seq_set_note(edit_step, (uint8_t)new_note);
+                ui_show_edit_note(edit_step, (uint8_t)new_note);
+                
+            } else {
+                // Playing mode: change BPM
+                uint32_t current_bpm = seq_get_bpm();
+                int new_bpm = (int)current_bpm + encoder_delta * encoder_step;
+                if (new_bpm < 20) new_bpm = 20;
+                if (new_bpm > 300) new_bpm = 300;
+                
+                seq_set_bpm((uint32_t)new_bpm);
+                clock_set_bpm((uint32_t)new_bpm);
+                ui_show_bpm((uint32_t)new_bpm);
+            }
         }
 
         if (clock_consume_tick()) {
