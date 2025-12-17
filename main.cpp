@@ -43,6 +43,7 @@ int main() {
             // If entering play mode, exit edit mode
             if (is_playing && edit_mode != EDIT_NONE) {
                 edit_mode = EDIT_NONE;
+                ui_clear();
                 ui_show_bpm(seq_get_bpm());
                 ui_show_steps(16, seq_get_steps());
             }
@@ -59,6 +60,7 @@ int main() {
                 } else {
                     // Exit edit mode
                     edit_mode = EDIT_NONE;
+                    ui_clear();
                     ui_show_bpm(seq_get_bpm());
                     ui_show_steps(16, seq_get_steps());
                 }

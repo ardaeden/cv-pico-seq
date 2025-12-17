@@ -170,6 +170,11 @@ void ui_init() {
     ssd1306_update();
 }
 
+void ui_clear() {
+    ssd1306_clear_fb();
+    ssd1306_update();
+}
+
 void ui_show_bpm(uint32_t bpm) {
     char numbuf[16];
     int numlen = snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
