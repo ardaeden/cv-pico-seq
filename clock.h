@@ -16,3 +16,6 @@ uint32_t clock_get_interval_us();
 
 // Enable/disable gate output (call when play/pause)
 void clock_gate_enable(bool enable);
+
+// Set CV/DAC value (updated on next tick by core 1)
+void clock_set_cv(uint16_t dac_value);

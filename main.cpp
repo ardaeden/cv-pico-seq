@@ -21,9 +21,6 @@ int main() {
     // Draw step grid immediately on boot so boxes are visible before playback
     ui_show_steps(seq_current_step(), seq_get_steps());
 
-    // Initialize MCP4822 DAC (SPI0: SCK=GP18, MOSI=GP19, CS=GP17)
-    mcp4822_init(17);
-
     // MIDI to CV conversion: 1V/octave, C1 (MIDI 36) = 0V reference
     // 4 octaves = 48 semitones = 4096 DAC units
     // DAC per semitone = 4096 / 48 = 85.333...
@@ -79,7 +76,8 @@ int main() {
             if (dac_val < 0) dac_val = 0;
             if (dac_val > 0x0FFF) dac_val = 0x0FFF;
             
-            mcp4822_set_voltage(0, (uint16_t)dac_val);
+            // Send CV to core 1 for synchronized output
+            clock_set_cv((uint16_t)dac_val);
 
             // Update step display (draw steps), then redraw BPM on top so BPM remains visible
             ui_show_steps(seq_current_step(), seq_get_steps());

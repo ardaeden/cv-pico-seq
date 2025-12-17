@@ -2,6 +2,7 @@
 
 #include "hardware/timer.h"
 #include "hardware/gpio.h"
+#include "hardware/spi.h"
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 
@@ -16,7 +17,12 @@ constexpr uint GATE_PIN = 6;
 volatile bool gate_active = false;
 volatile uint64_t gate_start_us = 0;
 volatile uint64_t gate_duration_us = 0;
-volatile bool gate_enabled = false;  // Set by core 0 when playing
+volatile bool gate_enabled = false;
+
+// DAC/CV control (managed by core1)
+constexpr uint DAC_CS_PIN = 17;
+volatile uint16_t dac_value = 0;
+volatile bool dac_update_pending = false;
 
 struct repeating_timer timer_state;
 
@@ -54,6 +60,16 @@ void core1_main() {
     gpio_init(GATE_PIN);
     gpio_set_dir(GATE_PIN, GPIO_OUT);
     gpio_put(GATE_PIN, false);
+    
+    // Initialize SPI0 for DAC (8 MHz, mode 0)
+    spi_init(spi0, 8000000);
+    gpio_set_function(18, GPIO_FUNC_SPI);  // SCK
+    gpio_set_function(19, GPIO_FUNC_SPI);  // MOSI
+    
+    // Initialize DAC CS pin
+    gpio_init(DAC_CS_PIN);
+    gpio_set_dir(DAC_CS_PIN, GPIO_OUT);
+    gpio_put(DAC_CS_PIN, true);
     
     add_repeating_timer_us(-100, timer_callback, nullptr, &timer_state);
     
@@ -94,4 +110,9 @@ void clock_gate_enable(bool enable) {
         gpio_put(GATE_PIN, false);
         gate_active = false;
     }
+}
+
+void clock_set_cv(uint16_t dac_val) {
+    dac_value = dac_val;
+    dac_update_pending = true;
 }
