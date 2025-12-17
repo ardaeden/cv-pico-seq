@@ -6,7 +6,8 @@
 #include "pico/time.h"
 
 namespace {
-constexpr uint BUTTON_PIN = 2;            // GP2
+constexpr uint BUTTON_PIN = 2;            // GP2 - Play button
+constexpr uint EDIT_BUTTON_PIN = 10;      // GP10 - Edit mode button
 constexpr uint64_t DEBOUNCE_US = 20'000;  // 20 ms debounce window
 constexpr uint LED_PIN = 3;               // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 50'000;  // 50 ms LED on time
@@ -17,6 +18,9 @@ constexpr uint ENCODER_SW = 13;           // GP13
 
 bool button_prev = true;               // starts high because of pull-up
 uint64_t last_button_event_us = 0;     // last time we toggled play state
+
+bool edit_button_prev = true;          // edit button starts high (pull-up)
+uint64_t last_edit_button_event_us = 0;
 
 // Encoder switch debounce
 bool encoder_sw_prev = true;
@@ -42,6 +46,10 @@ void io_init() {
     gpio_set_dir(BUTTON_PIN, GPIO_IN);
     gpio_pull_up(BUTTON_PIN);
 
+    gpio_init(EDIT_BUTTON_PIN);
+    gpio_set_dir(EDIT_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(EDIT_BUTTON_PIN);
+
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
 }
@@ -52,6 +60,19 @@ bool io_poll_play_toggle() {
     if (button_now != button_prev && (now_us - last_button_event_us) >= DEBOUNCE_US) {
         button_prev = button_now;
         last_button_event_us = now_us;
+        if (!button_now) { // active-low press
+            return true;
+        }
+    }
+    return false;
+}
+
+bool io_poll_edit_toggle() {
+    bool button_now = gpio_get(EDIT_BUTTON_PIN);
+    uint64_t now_us = time_us_64();
+    if (button_now != edit_button_prev && (now_us - last_edit_button_event_us) >= DEBOUNCE_US) {
+        edit_button_prev = button_now;
+        last_edit_button_event_us = now_us;
         if (!button_now) { // active-low press
             return true;
         }

@@ -8,6 +8,9 @@ void io_init();
 // Returns true when play/pause button was pressed (debounced, edge-triggered).
 bool io_poll_play_toggle();
 
+// Returns true when edit mode button was pressed (debounced, edge-triggered).
+bool io_poll_edit_toggle();
+
 // Start LED blink (non-blocking)
 void io_blink_led_start();
 

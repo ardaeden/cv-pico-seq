@@ -35,20 +35,33 @@ int main() {
     while (true) {
         io_update_led();  // non-blocking LED update
 
-        // Play button handling
+        // Play button: only play/stop
         if (io_poll_play_toggle()) {
             bool is_playing = seq_toggle_play();
             clock_gate_enable(is_playing);
             
-            // Enter/exit edit mode
-            if (!is_playing) {
-                edit_mode = EDIT_SELECT_STEP;
-                edit_step = 0;
-                ui_show_edit_step(edit_step, seq_get_note(edit_step));
-            } else {
+            // If entering play mode, exit edit mode
+            if (is_playing && edit_mode != EDIT_NONE) {
                 edit_mode = EDIT_NONE;
                 ui_show_bpm(seq_get_bpm());
                 ui_show_steps(16, seq_get_steps());
+            }
+        }
+
+        // Edit button: toggle edit mode (only when stopped)
+        if (io_poll_edit_toggle()) {
+            if (!seq_is_playing()) {
+                if (edit_mode == EDIT_NONE) {
+                    // Enter edit mode
+                    edit_mode = EDIT_SELECT_STEP;
+                    edit_step = 0;
+                    ui_show_edit_step(edit_step, seq_get_note(edit_step));
+                } else {
+                    // Exit edit mode
+                    edit_mode = EDIT_NONE;
+                    ui_show_bpm(seq_get_bpm());
+                    ui_show_steps(16, seq_get_steps());
+                }
             }
         }
 
