@@ -25,5 +25,6 @@ void seq_set_note(uint32_t step, uint8_t note);
 
 // Pattern save/load operations (10 slots: 0-9)
 void seq_save_pattern(uint8_t slot);    // Save current pattern to slot
-void seq_load_pattern(uint8_t slot);    // Load pattern from slot
+void seq_load_pattern(uint8_t slot);    // Load pattern from slot immediately
+void seq_queue_pattern(uint8_t slot);   // Queue pattern to load at next pattern boundary
 void seq_init_flash();                   // Initialize pattern storage on boot

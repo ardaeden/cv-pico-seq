@@ -60,6 +60,8 @@ static const uint8_t font5x7[][5] = {
     {0x61,0x51,0x49,0x45,0x43}, // Z
     // '#'
     {0x14,0x7F,0x14,0x7F,0x14},
+    // '/'
+    {0x60,0x30,0x18,0x0C,0x06},
     // '>'
     {0x41,0x22,0x14,0x08,0x00},
     // '<'
@@ -74,8 +76,9 @@ static int char_to_font_index(char c) {
     if (c >= 'A' && c <= 'Z') return 12 + (c - 'A');
     if (c >= 'a' && c <= 'z') return 12 + (c - 'a'); // treat lowercase as uppercase
     if (c == '#') return 38;
-    if (c == '>') return 39;
-    if (c == '<') return 40;
+    if (c == '/') return 39;
+    if (c == '>') return 40;
+    if (c == '<') return 41;
     return 0; // fallback to space
 }
 
@@ -374,16 +377,15 @@ void ui_show_edit_note(uint32_t step, uint8_t note) {
 void ui_show_pattern_select(uint8_t slot) {
     ssd1306_clear_fb();
     
-    // Title
-    ui_draw_text(16, 0, "PATTERN SELECT");
+    // Title (centered)
+    ui_draw_text(22, 0, "PATTERN SELECT");
     
-    // Current slot number (large, centered)
-    char buf[32];
-    sprintf(buf, "Slot: %d", slot);
-    ui_draw_text(30, 3, buf);
+    // Slot number large and centered (3x scale, centered vertically and horizontally)
+    char slot_char = '0' + slot;
+    draw_scaled_char(56, 24, slot_char, 3);  // Vertically centered
     
     // Instructions
-    ui_draw_text(0, 6, "GP11=Save GP12=Load");
+    ui_draw_text(36, 7, "LOAD/SAVE");
     
     ssd1306_update();
 }

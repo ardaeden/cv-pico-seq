@@ -32,6 +32,7 @@ int main() {
     EditMode edit_mode = EDIT_NONE;
     uint32_t edit_step = 0;
     uint8_t pattern_slot = 0;  // Current pattern slot (0-9)
+    uint8_t temp_pattern_slot = 0;  // Temporary slot during selection
     
     int encoder_step = 1; // 1 = fine, 10 = coarse (for BPM)
     while (true) {
@@ -42,34 +43,31 @@ int main() {
             bool is_playing = seq_toggle_play();
             clock_gate_enable(is_playing);
             
-            // If entering play mode, exit edit mode
-            if (is_playing && edit_mode != EDIT_NONE) {
-                edit_mode = EDIT_NONE;
-                ui_clear();
+            // Just update display when stopping (no clear, prevent flicker)
+            if (!is_playing && edit_mode == EDIT_NONE) {
                 ui_show_bpm(seq_get_bpm(), pattern_slot);
                 ui_show_steps(16, seq_get_steps());
             }
         }
 
-        // Edit button: cycle through modes (only when stopped)
+        // Edit button: cycle through modes
         if (io_poll_edit_toggle()) {
-            if (!seq_is_playing()) {
-                if (edit_mode == EDIT_NONE) {
-                    // Enter step edit mode
-                    edit_mode = EDIT_SELECT_STEP;
-                    edit_step = 0;
-                    ui_show_edit_step(edit_step, seq_get_note(edit_step));
-                } else if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE) {
-                    // Enter pattern select mode
-                    edit_mode = PATTERN_SELECT;
-                    ui_show_pattern_select(pattern_slot);
-                } else if (edit_mode == PATTERN_SELECT) {
-                    // Return to normal mode
-                    edit_mode = EDIT_NONE;
-                    ui_clear();
-                    ui_show_bpm(seq_get_bpm(), pattern_slot);
-                    ui_show_steps(16, seq_get_steps());
-                }
+            if (edit_mode == EDIT_NONE) {
+                // Enter step edit mode (allowed while playing)
+                edit_mode = EDIT_SELECT_STEP;
+                edit_step = 0;
+                ui_show_edit_step(edit_step, seq_get_note(edit_step));
+            } else if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE) {
+                // Enter pattern select mode (allowed during playback)
+                edit_mode = PATTERN_SELECT;
+                temp_pattern_slot = pattern_slot;  // Save current slot to temp
+                ui_show_pattern_select(temp_pattern_slot);
+            } else if (edit_mode == PATTERN_SELECT) {
+                // Return to normal mode without loading (cancel)
+                edit_mode = EDIT_NONE;
+                ui_clear();
+                ui_show_bpm(seq_get_bpm(), pattern_slot);
+                ui_show_steps(16, seq_get_steps());
             }
         }
 
@@ -110,12 +108,12 @@ int main() {
                 ui_show_edit_note(edit_step, (uint8_t)new_note);
                 
             } else if (edit_mode == PATTERN_SELECT) {
-                // Change pattern slot
-                int new_slot = (int)pattern_slot + encoder_delta;
+                // Change temporary pattern slot
+                int new_slot = (int)temp_pattern_slot + encoder_delta;
                 if (new_slot < 0) new_slot = 0;
                 if (new_slot > 9) new_slot = 9;
-                pattern_slot = (uint8_t)new_slot;
-                ui_show_pattern_select(pattern_slot);
+                temp_pattern_slot = (uint8_t)new_slot;
+                ui_show_pattern_select(temp_pattern_slot);
                 
             } else {
                 // Playing mode: change BPM
@@ -133,7 +131,8 @@ int main() {
         // Save/Load button handling (only in pattern select mode)
         if (edit_mode == PATTERN_SELECT) {
             if (io_poll_save_button()) {
-                seq_save_pattern(pattern_slot);
+                seq_save_pattern(temp_pattern_slot);
+                pattern_slot = temp_pattern_slot;  // Commit slot change
                 io_blink_led_start();  // Visual feedback
                 // Return to normal mode after save
                 edit_mode = EDIT_NONE;
@@ -142,13 +141,20 @@ int main() {
                 ui_show_steps(16, seq_get_steps());
             }
             if (io_poll_load_button()) {
-                seq_load_pattern(pattern_slot);
+                if (seq_is_playing()) {
+                    // Queue pattern change at next pattern boundary
+                    seq_queue_pattern(temp_pattern_slot);
+                } else {
+                    // Load immediately when stopped
+                    seq_load_pattern(temp_pattern_slot);
+                }
+                pattern_slot = temp_pattern_slot;  // Commit slot change
                 io_blink_led_start();  // Visual feedback
                 // Return to normal mode after load
                 edit_mode = EDIT_NONE;
                 ui_clear();
                 ui_show_bpm(seq_get_bpm(), pattern_slot);
-                ui_show_steps(16, seq_get_steps());
+                ui_show_steps(seq_is_playing() ? seq_current_step() : 16, seq_get_steps());
             }
         }
 
@@ -176,9 +182,11 @@ int main() {
             // Send CV to core 1 for synchronized output
             clock_set_cv((uint16_t)dac_val);
 
-            // Update step display (draw steps), then redraw BPM on top so BPM remains visible
-            ui_show_steps(seq_current_step(), seq_get_steps());
-            ui_show_bpm(seq_get_bpm(), pattern_slot);
+            // Update step display only if not in edit mode
+            if (edit_mode == EDIT_NONE) {
+                ui_show_steps(seq_current_step(), seq_get_steps());
+                ui_show_bpm(seq_get_bpm(), pattern_slot);
+            }
 
             // Blink LED every 4 steps (quarter note)
             if (seq_current_step() % 4 == 0) {
