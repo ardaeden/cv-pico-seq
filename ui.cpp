@@ -2,6 +2,7 @@
 
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
+#include "sequencer.h"  // For seq_get_gate_enabled()
 
 #include <cstring>
 #include <cstdio>
@@ -330,6 +331,11 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
     sprintf(buf, "Note: %s", note_str);
     ui_draw_text(0, 4, buf);
     
+    // Gate status
+    bool gate_on = seq_get_gate_enabled(selected_step);
+    sprintf(buf, "Gate: %s", gate_on ? "ON" : "OFF");
+    ui_draw_text(0, 6, buf);
+    
     // Draw step grid with highlight
     const int cols = 8;
     const int sq = 8;
@@ -370,6 +376,11 @@ void ui_show_edit_note(uint32_t step, uint8_t note) {
     note_to_string(note, note_str);
     sprintf(buf, ">> %s <<", note_str);
     ui_draw_text(20, 4, buf);
+    
+    // Gate status
+    bool gate_on = seq_get_gate_enabled(step);
+    sprintf(buf, "Gate: %s", gate_on ? "ON" : "OFF");
+    ui_draw_text(0, 6, buf);
     
     ssd1306_update();
 }

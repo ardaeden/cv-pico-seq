@@ -5,11 +5,12 @@
 #include "pico/stdlib.h"
 
 namespace {
-// Pattern storage in RAM (10 slots x 16 notes)
+// Pattern storage in RAM (10 slots x 16 notes + 2 bytes gate mask)
 constexpr uint8_t NUM_PATTERN_SLOTS = 10;
 constexpr uint8_t PATTERN_SIZE = 16;  // 16 notes per pattern
 
 uint8_t pattern_storage[NUM_PATTERN_SLOTS][PATTERN_SIZE] = {0};
+uint16_t gate_mask_storage[NUM_PATTERN_SLOTS] = {0};  // Gate enable mask for each pattern
 int8_t pending_pattern_slot = -1;  // -1 = no pending pattern, 0-9 = slot to load at next pattern boundary
 
 struct SequencerState {
@@ -19,11 +20,12 @@ struct SequencerState {
     uint32_t current_step;
     std::atomic<bool> playing;
     uint8_t notes[16];  // MIDI note numbers for each step
+    uint16_t gate_mask;  // Bit mask for gate enable (1=gate active, 0=gate off)
 };
 
-// Default: C major scale starting from C3 (MIDI 48)
+// Default: C major scale starting from C3 (MIDI 48), all gates enabled
 static SequencerState state = {120, 4, 16, 15, false, 
-    {48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74}};
+    {48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74}, 0xFFFF};
 } // namespace
 
 void seq_init() {
@@ -61,6 +63,7 @@ void seq_advance_step() {
         // Load the pending pattern at pattern boundary
         if (pending_pattern_slot < NUM_PATTERN_SLOTS) {
             memcpy(state.notes, pattern_storage[pending_pattern_slot], PATTERN_SIZE);
+            state.gate_mask = gate_mask_storage[pending_pattern_slot];
         }
         pending_pattern_slot = -1;  // Clear pending state
     }
@@ -91,6 +94,25 @@ void seq_set_note(uint32_t step, uint8_t note) {
     if (step >= 16) return;
     if (note > 127) note = 127;
     state.notes[step] = note;
+}
+
+bool seq_get_gate_enabled(uint32_t step) {
+    if (step >= 16) return false;
+    return (state.gate_mask & (1 << step)) != 0;
+}
+
+void seq_set_gate_enabled(uint32_t step, bool enabled) {
+    if (step >= 16) return;
+    if (enabled) {
+        state.gate_mask |= (1 << step);
+    } else {
+        state.gate_mask &= ~(1 << step);
+    }
+}
+
+void seq_toggle_gate(uint32_t step) {
+    if (step >= 16) return;
+    state.gate_mask ^= (1 << step);
 }
 
 void seq_init_flash() {
@@ -134,20 +156,27 @@ void seq_init_flash() {
     memcpy(pattern_storage[7], pattern7, PATTERN_SIZE);
     memcpy(pattern_storage[8], pattern8, PATTERN_SIZE);
     memcpy(pattern_storage[9], pattern9, PATTERN_SIZE);
+    
+    // Initialize all gate masks (all gates enabled by default)
+    for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
+        gate_mask_storage[i] = 0xFFFF;
+    }
 }
 
 void seq_save_pattern(uint8_t slot) {
     if (slot >= NUM_PATTERN_SLOTS) return;
     
-    // Save current notes to RAM slot
+    // Save current notes and gate mask to RAM slot
     memcpy(pattern_storage[slot], state.notes, PATTERN_SIZE);
+    gate_mask_storage[slot] = state.gate_mask;
 }
 
 void seq_load_pattern(uint8_t slot) {
     if (slot >= NUM_PATTERN_SLOTS) return;
     
-    // Load pattern from RAM slot
+    // Load pattern and gate mask from RAM slot
     memcpy(state.notes, pattern_storage[slot], PATTERN_SIZE);
+    state.gate_mask = gate_mask_storage[slot];
 }
 
 void seq_queue_pattern(uint8_t slot) {

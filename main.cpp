@@ -128,12 +128,21 @@ int main() {
             }
         }
 
-        // Save/Load button handling (only in pattern select mode)
-        if (edit_mode == PATTERN_SELECT) {
+        // Save/Load button handling
+        if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE) {
+            // In step edit mode: Load button toggles gate for current step
+            if (io_poll_load_button()) {
+                seq_toggle_gate(edit_step);
+                if (edit_mode == EDIT_SELECT_STEP) {
+                    ui_show_edit_step(edit_step, seq_get_note(edit_step));
+                } else {
+                    ui_show_edit_note(edit_step, seq_get_note(edit_step));
+                }
+            }
+        } else if (edit_mode == PATTERN_SELECT) {
             if (io_poll_save_button()) {
                 seq_save_pattern(temp_pattern_slot);
                 pattern_slot = temp_pattern_slot;  // Commit slot change
-                io_blink_led_start();  // Visual feedback
                 // Return to normal mode after save
                 edit_mode = EDIT_NONE;
                 ui_clear();
@@ -149,7 +158,6 @@ int main() {
                     seq_load_pattern(temp_pattern_slot);
                 }
                 pattern_slot = temp_pattern_slot;  // Commit slot change
-                io_blink_led_start();  // Visual feedback
                 // Return to normal mode after load
                 edit_mode = EDIT_NONE;
                 ui_clear();
@@ -170,6 +178,10 @@ int main() {
             // Get MIDI note for current step and convert to CV
             uint32_t cur = seq_current_step();
             uint8_t midi_note = seq_get_note(cur);
+            
+            // Check if gate is enabled for this step
+            bool gate_enabled = seq_get_gate_enabled(cur);
+            clock_gate_enable(gate_enabled);
             
             // Convert MIDI note to DAC value (1V/octave)
             int32_t semitones = (int32_t)midi_note - MIDI_BASE;
