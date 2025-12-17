@@ -19,29 +19,20 @@ void mcp4822_init(uint cs_pin) {
     gpio_put(CS_PIN, true);
 }
 
-void mcp4822_set_voltage(uint8_t channel, uint8_t gain, uint16_t value) {
-    // sanitize
+void mcp4822_set_voltage(uint8_t channel, uint16_t value) {
     if (value > 0x0FFF) value = 0x0FFF;
     uint16_t command = 0;
-    // Build command: [C1 C0 | BUF | GA | SHDN | D11..D0]
-    // Use similar mapping to sample: channel selects bit, gain as in sample.
-    // For MCP4822: command high nibble for control bits. We'll follow sample's bits.
-    if (channel) command |= 0x8000; // select channel B (bit 15)
-    else command |= 0x0000; // channel A
-
-    // gain bit: sample used 1 -> 2X, set Gx = 0 for 2x per MCP4822 datasheet
-    if (gain == 0) {
-        // 1x: set GA = 1 per datasheet (in our mapping set the bit)
-        command |= 0x2000; // set bit so that gain = 1X
-    } else {
-        // 2x: GA = 0
-        // nothing to OR
-    }
-
-    // shutdown bit (active) = 1 for active
+    
+    // Channel select
+    if (channel) command |= 0x8000;
+    
+    // 2X gain: GA = 0 (bit 13 cleared)
+    // 1X gain would be: command |= 0x2000;
+    
+    // Shutdown bit (active)
     command |= 0x1000;
-
-    // data bits
+    
+    // Data bits
     command |= (value & 0x0FFF);
 
     // Send MSB first

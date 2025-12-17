@@ -9,9 +9,12 @@ struct SequencerState {
     uint32_t steps;
     uint32_t current_step;
     std::atomic<bool> playing;
+    uint8_t notes[16];  // MIDI note numbers for each step
 };
 
-static SequencerState state = {120, 4, 16, 0, false};
+// Default: C major scale starting from C3 (MIDI 48)
+static SequencerState state = {120, 4, 16, 0, false, 
+    {48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74}};
 } // namespace
 
 void seq_init() {
@@ -65,4 +68,15 @@ uint32_t seq_get_ppqn() {
 
 uint32_t seq_get_steps() {
     return state.steps;
+}
+
+uint8_t seq_get_note(uint32_t step) {
+    if (step >= 16) step = 0;
+    return state.notes[step];
+}
+
+void seq_set_note(uint32_t step, uint8_t note) {
+    if (step >= 16) return;
+    if (note > 127) note = 127;
+    state.notes[step] = note;
 }

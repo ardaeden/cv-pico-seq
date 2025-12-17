@@ -21,3 +21,7 @@ uint32_t seq_get_ppqn();
 
 // Return number of steps in the sequence
 uint32_t seq_get_steps();
+
+// Note operations (MIDI note numbers 0-127)
+uint8_t seq_get_note(uint32_t step);
+void seq_set_note(uint32_t step, uint8_t note);

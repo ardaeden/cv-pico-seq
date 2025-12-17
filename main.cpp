@@ -24,7 +24,11 @@ int main() {
     // Initialize MCP4822 DAC (SPI0: SCK=GP18, MOSI=GP19, CS=GP17)
     mcp4822_init(17);
 
-    const float NOTE_SF = 47.069f;
+    // MIDI to CV conversion: 1V/octave, C1 (MIDI 36) = 0V reference
+    // 4 octaves = 48 semitones = 4096 DAC units
+    // DAC per semitone = 4096 / 48 = 85.333...
+    constexpr uint8_t MIDI_BASE = 36;  // C1 as 0V
+    constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
 
     int encoder_step = 1; // 1 = fine, 10 = coarse
     while (true) {
@@ -63,11 +67,19 @@ int main() {
             // Advance one step per tick (tick represents 16th note when ppqn==4)
             seq_advance_step();
 
-            // Compute and set CV for current step using MCP4822 channel A
+            // Get MIDI note for current step and convert to CV
             uint32_t cur = seq_current_step();
-            uint16_t dac_val = (uint16_t)((float)cur * NOTE_SF + 0.5f);
+            uint8_t midi_note = seq_get_note(cur);
+            
+            // Convert MIDI note to DAC value (1V/octave)
+            int32_t semitones = (int32_t)midi_note - MIDI_BASE;
+            int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
+            
+            // Clamp to valid range
+            if (dac_val < 0) dac_val = 0;
             if (dac_val > 0x0FFF) dac_val = 0x0FFF;
-            mcp4822_set_voltage(0, 1, dac_val);
+            
+            mcp4822_set_voltage(0, (uint16_t)dac_val);
 
             // Update step display (draw steps), then redraw BPM on top so BPM remains visible
             ui_show_steps(seq_current_step(), seq_get_steps());
