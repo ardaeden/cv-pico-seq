@@ -23,6 +23,7 @@ add_executable(${CMAKE_PROJECT_NAME}
     io.cpp
     sequencer.cpp
     ui.cpp
+    eeprom.cpp
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} 

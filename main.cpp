@@ -10,6 +10,7 @@ int main() {
     io_encoder_init();
     seq_init();
     seq_init_flash();
+    seq_load_pattern(0);
 
     clock_set_bpm(seq_get_bpm());
     clock_launch_core1();
@@ -125,6 +126,7 @@ int main() {
         } else if (edit_mode == PATTERN_SELECT) {
             if (io_poll_save_button()) {
                 seq_save_pattern(temp_pattern_slot);
+                io_blink_led_start();
                 pattern_slot = temp_pattern_slot;
                 edit_mode = EDIT_NONE;
                 ui_clear();
@@ -137,6 +139,7 @@ int main() {
                 } else {
                     seq_load_pattern(temp_pattern_slot);
                 }
+                io_blink_led_start();
                 pattern_slot = temp_pattern_slot;
                 edit_mode = EDIT_NONE;
                 ui_clear();

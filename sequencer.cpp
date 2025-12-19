@@ -3,6 +3,8 @@
 #include <atomic>
 #include <cstring>
 #include "pico/stdlib.h"
+#include "hardware/gpio.h"
+#include "eeprom.h"
 
 namespace {
 constexpr uint8_t NUM_PATTERN_SLOTS = 10;
@@ -132,6 +134,7 @@ void seq_save_pattern(uint8_t slot) {
 
 void seq_load_pattern(uint8_t slot) {
     if (slot >= NUM_PATTERN_SLOTS) return;
+    
     memcpy(state.notes, pattern_storage[slot], PATTERN_SIZE);
     state.gate_mask = gate_mask_storage[slot];
 }
