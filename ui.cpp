@@ -368,23 +368,62 @@ static void fill_rect(int x0, int y0, int w, int h) {
     }
 }
 
-// Draw a small filled circle (3x3 pixels)
+// Draw a filled circle (7x7 pixels)
 static void draw_small_circle(int cx, int cy) {
-    // Simple 3x3 circle pattern
+    set_pixel(cx - 1, cy - 2);
+    set_pixel(cx, cy - 2);
+    set_pixel(cx + 1, cy - 2);
+    
+    set_pixel(cx - 2, cy - 1);
+    set_pixel(cx - 1, cy - 1);
     set_pixel(cx, cy - 1);
+    set_pixel(cx + 1, cy - 1);
+    set_pixel(cx + 2, cy - 1);
+    
+    set_pixel(cx - 2, cy);
     set_pixel(cx - 1, cy);
     set_pixel(cx, cy);
     set_pixel(cx + 1, cy);
+    set_pixel(cx + 2, cy);
+    
+    set_pixel(cx - 2, cy + 1);
+    set_pixel(cx - 1, cy + 1);
     set_pixel(cx, cy + 1);
+    set_pixel(cx + 1, cy + 1);
+    set_pixel(cx + 2, cy + 1);
+    
+    set_pixel(cx - 1, cy + 2);
+    set_pixel(cx, cy + 2);
+    set_pixel(cx + 1, cy + 2);
 }
 
-// Draw a small filled circle with inverse (clear pixels instead of set)
+// Draw a filled circle with inverse (clear pixels instead of set)
 static void draw_small_circle_inverse(int cx, int cy) {
+    clear_pixel(cx - 1, cy - 2);
+    clear_pixel(cx, cy - 2);
+    clear_pixel(cx + 1, cy - 2);
+    
+    clear_pixel(cx - 2, cy - 1);
+    clear_pixel(cx - 1, cy - 1);
     clear_pixel(cx, cy - 1);
+    clear_pixel(cx + 1, cy - 1);
+    clear_pixel(cx + 2, cy - 1);
+    
+    clear_pixel(cx - 2, cy);
     clear_pixel(cx - 1, cy);
     clear_pixel(cx, cy);
     clear_pixel(cx + 1, cy);
+    clear_pixel(cx + 2, cy);
+    
+    clear_pixel(cx - 2, cy + 1);
+    clear_pixel(cx - 1, cy + 1);
     clear_pixel(cx, cy + 1);
+    clear_pixel(cx + 1, cy + 1);
+    clear_pixel(cx + 2, cy + 1);
+    
+    clear_pixel(cx - 1, cy + 2);
+    clear_pixel(cx, cy + 2);
+    clear_pixel(cx + 1, cy + 2);
 }
 
 void ui_show_steps(uint32_t current_step, uint32_t steps) {
@@ -416,16 +455,11 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
             draw_rect_outline(x, y, sq, sq);
         }
         
-        // Draw gate indicator circle
         if (gate_enabled) {
-            int cx = x + sq / 2;
-            int cy = y + sq / 2;
             if (is_current) {
-                // Inverse circle for current step
-                draw_small_circle_inverse(cx, cy);
+                clear_region(x + 3, y + 3, 6, 6);
             } else {
-                // Normal circle for other steps
-                draw_small_circle(cx, cy);
+                fill_rect(x + 3, y + 3, 6, 6);
             }
         }
     }
@@ -478,16 +512,11 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
             draw_rect_outline(x, step_y, sq, sq);
         }
         
-        // Draw circle if gate is enabled
         if (gate_enabled) {
-            int cx = x + sq / 2;
-            int cy = step_y + sq / 2;
             if (is_selected) {
-                // Inverse circle for selected step (white on black)
-                draw_small_circle_inverse(cx, cy);
+                clear_region(x + 3, step_y + 3, 6, 6);
             } else {
-                // Normal circle for unselected step (black on white)
-                draw_small_circle(cx, cy);
+                fill_rect(x + 3, step_y + 3, 6, 6);
             }
         }
     }
