@@ -28,8 +28,8 @@ bool seq_get_gate_enabled(uint32_t step);
 void seq_toggle_gate(uint32_t step);
 
 // Pattern save/load operations (10 slots: 0-9)
-void seq_save_pattern(uint8_t slot);    // Save current pattern to slot
-void seq_load_pattern(uint8_t slot);    // Load pattern from slot immediately
-void seq_queue_pattern(uint8_t slot);   // Queue pattern to load at next pattern boundary
-int8_t seq_get_pending_pattern();       // Get pending pattern slot (-1 if none)
-void seq_init_flash();                   // Initialize pattern storage on boot
+void seq_save_pattern(uint8_t slot);
+void seq_load_pattern(uint8_t slot);
+void seq_queue_pattern(uint8_t slot);
+int8_t seq_get_pending_pattern();
+void seq_init_flash();
