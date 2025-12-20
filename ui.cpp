@@ -349,6 +349,14 @@ static void clear_region(int x0, int y0, int w, int h) {
     }
 }
 
+// Helper: draw scaled text
+static void draw_scaled_text(int x, int y, const char* text, int scale) {
+    for (const char *p = text; *p; ++p) {
+        draw_scaled_char(x, y, *p, scale);
+        x += (5 * scale) + 2;
+    }
+}
+
 static void draw_rect_outline(int x0, int y0, int w, int h) {
     for (int x = x0; x < x0 + w; ++x) {
         set_pixel(x, y0);
@@ -507,16 +515,14 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
         bool gate_enabled = seq_get_gate_enabled(i);
         
         if (is_selected) {
-            fill_rect(x + 2, step_y + 2, sq - 4, sq - 4);
-        } else {
             draw_rect_outline(x, step_y, sq, sq);
-        }
-        
-        if (gate_enabled) {
-            if (is_selected) {
-                clear_region(x + 3, step_y + 3, 6, 6);
-            } else {
+            if (gate_enabled) {
                 fill_rect(x + 3, step_y + 3, 6, 6);
+            }
+        } else {
+            draw_rect_outline(x + 1, step_y + 1, sq - 2, sq - 2);
+            if (gate_enabled) {
+                fill_rect(x + 4, step_y + 4, 4, 4);
             }
         }
     }
@@ -535,16 +541,19 @@ void ui_show_edit_note(uint32_t step, uint8_t note) {
     sprintf(buf, "Step: %02d", step + 1);
     ui_draw_text(0, 2, buf);
     
-    // Note name (large)
+    // Gate status (with spacing)
+    bool gate_on = seq_get_gate_enabled(step);
+    sprintf(buf, "Gate: %s", gate_on ? "ON" : "OFF");
+    ui_draw_text(0, 4, buf);
+    
+    // Note name (large, centered, 2x scale, lower)
     char note_str[8];
     note_to_string(note, note_str);
     sprintf(buf, ">> %s <<", note_str);
-    ui_draw_text(20, 4, buf);
     
-    // Gate status
-    bool gate_on = seq_get_gate_enabled(step);
-    sprintf(buf, "Gate: %s", gate_on ? "ON" : "OFF");
-    ui_draw_text(0, 6, buf);
+    int text_width = strlen(buf) * 6 * 2;
+    int center_x = (128 - text_width) / 2;
+    draw_scaled_text(center_x, 47, buf, 2);
     
     ssd1306_update();
 }
