@@ -2,31 +2,27 @@
 
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
-#include "sequencer.h"  // For seq_get_gate_enabled()
+#include "sequencer.h"
 
 #include <cstring>
 #include <cstdio>
 
-// SSD1306 basic config
 static const int SDA_PIN = 4;
 static const int SCL_PIN = 5;
 static const uint8_t SSD1306_ADDR = 0x3C;
 
-// 128x64 framebuffer (pages of 8 rows)
 static uint8_t fb[128 * 8];
 
-// Edit screen cache variables
 static int32_t ui_edit_step_prev_step = -1;
 static uint8_t ui_edit_step_prev_note = 0;
+static uint16_t ui_edit_step_prev_gate = 0xFFFF;
 static uint8_t ui_edit_note_prev_note = 255;
 static bool ui_edit_note_prev_gate = false;
-static uint32_t ui_edit_note_prev_step = 255; // 1024 bytes
+static uint32_t ui_edit_note_prev_step = 255;
+static int8_t ui_pattern_select_prev_slot = -1;
 
-// Minimal 5x7 font for digits and few letters
 static const uint8_t font5x7[][5] = {
-    // ' ' (space)
     {0x00,0x00,0x00,0x00,0x00},
-    // '0'-'9'
     {0x3E,0x51,0x49,0x45,0x3E}, // 0
     {0x00,0x42,0x7F,0x40,0x00}, // 1
     {0x42,0x61,0x51,0x49,0x46}, // 2
@@ -37,9 +33,7 @@ static const uint8_t font5x7[][5] = {
     {0x01,0x71,0x09,0x05,0x03}, // 7
     {0x36,0x49,0x49,0x49,0x36}, // 8
     {0x06,0x49,0x49,0x29,0x1E}, // 9
-    // ':'
-    {0x00,0x36,0x36,0x00,0x00},
-    // 'A'-'Z'
+    {0x00,0x36,0x36,0x00,0x00}, // :
     {0x7E,0x09,0x09,0x09,0x7E}, // A
     {0x7F,0x49,0x49,0x49,0x36}, // B
     {0x3E,0x41,0x41,0x41,0x22}, // C
@@ -66,28 +60,23 @@ static const uint8_t font5x7[][5] = {
     {0x63,0x14,0x08,0x14,0x63}, // X
     {0x07,0x08,0x70,0x08,0x07}, // Y
     {0x61,0x51,0x49,0x45,0x43}, // Z
-    // '#'
-    {0x14,0x7F,0x14,0x7F,0x14},
-    // '/'
-    {0x60,0x30,0x18,0x0C,0x06},
-    // '>'
-    {0x41,0x22,0x14,0x08,0x00},
-    // '<'
-    {0x08,0x14,0x22,0x41,0x00}
+    {0x14,0x7F,0x14,0x7F,0x14}, // #
+    {0x60,0x30,0x18,0x0C,0x06}, // /
+    {0x41,0x22,0x14,0x08,0x00}, // >
+    {0x08,0x14,0x22,0x41,0x00}  // <
 };
 
-// Map chars we use to indices in font5x7
 static int char_to_font_index(char c) {
     if (c == ' ') return 0;
     if (c >= '0' && c <= '9') return 1 + (c - '0');
     if (c == ':') return 11;
     if (c >= 'A' && c <= 'Z') return 12 + (c - 'A');
-    if (c >= 'a' && c <= 'z') return 12 + (c - 'a'); // treat lowercase as uppercase
+    if (c >= 'a' && c <= 'z') return 12 + (c - 'a');
     if (c == '#') return 38;
     if (c == '/') return 39;
     if (c == '>') return 40;
     if (c == '<') return 41;
-    return 0; // fallback to space
+    return 0;
 }
 
 static void ssd1306_write_command(uint8_t cmd) {
@@ -122,15 +111,27 @@ static void ssd1306_clear_fb() {
     memset(fb, 0x00, sizeof(fb));
 }
 
-static void ssd1306_update() {
-    // send framebuffer by pages
+void ssd1306_update() {
     for (uint8_t page = 0; page < 8; ++page) {
         ssd1306_write_command(0xB0 | page);
         ssd1306_write_command(0x00);
         ssd1306_write_command(0x10);
 
         uint8_t buf[129];
-        buf[0] = 0x40; // control byte for data
+        buf[0] = 0x40;
+        memcpy(&buf[1], &fb[page * 128], 128);
+        i2c_write_blocking(i2c0, SSD1306_ADDR, buf, 129, false);
+    }
+}
+
+static void ssd1306_update_region(uint8_t start_page, uint8_t end_page) {
+    for (uint8_t page = start_page; page <= end_page && page < 8; ++page) {
+        ssd1306_write_command(0xB0 | page);
+        ssd1306_write_command(0x00);
+        ssd1306_write_command(0x10);
+
+        uint8_t buf[129];
+        buf[0] = 0x40;
         memcpy(&buf[1], &fb[page * 128], 128);
         i2c_write_blocking(i2c0, SSD1306_ADDR, buf, 129, false);
     }
@@ -168,7 +169,7 @@ static void clear_pixel(int x, int y) {
     fb[page * 128 + x] &= ~(1u << bit);
 }
 
-static void draw_scaled_char(int x0, int y0, char c, int scale) {
+void draw_scaled_char(int x0, int y0, char c, int scale) {
     int idx = char_to_font_index(c);
     const uint8_t *glyph = font5x7[idx];
     // glyph: 5 columns, 7 rows (LSB top)
@@ -195,7 +196,7 @@ void ui_init() {
     gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(SDA_PIN);
     gpio_pull_up(SCL_PIN);
-    // quick probe to see if a device ACKs at the address
+    
     uint8_t probe = 0x00;
     int probe_res = i2c_write_blocking(i2c0, SSD1306_ADDR, &probe, 1, false);
     if (probe_res < 0) {
@@ -299,9 +300,11 @@ void ui_clear() {
     
     ui_edit_step_prev_step = -1;
     ui_edit_step_prev_note = 0;
+    ui_edit_step_prev_gate = 0xFFFF;
     ui_edit_note_prev_note = 255;
     ui_edit_note_prev_gate = false;
     ui_edit_note_prev_step = 255;
+    ui_pattern_select_prev_slot = -1;
 }
 
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, bool blink_slot) {
@@ -344,7 +347,7 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, bool blink_slot) {
 }
 
 // Helper: clear rectangular region (inclusive) in pixel coords
-static void clear_region(int x0, int y0, int w, int h) {
+void clear_region(int x0, int y0, int w, int h) {
     if (w <= 0 || h <= 0) return;
     int x1 = x0 + w - 1;
     int y1 = y0 + h - 1;
@@ -524,7 +527,7 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
                     fill_rect(x + 3, step_y + 3, 6, 6);
                 }
             } else {
-                draw_rect_outline(x + 1, step_y + 1, sq - 2, sq - 2);
+                draw_rect_outline(x + 2, step_y + 2, sq - 4, sq - 4);
                 if (gate_enabled) {
                     fill_rect(x + 4, step_y + 4, 4, 4);
                 }
@@ -533,6 +536,11 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
     } else {
         clear_region(0, 16, 128, 8);
         
+        uint16_t current_gate_mask = 0;
+        for (int i = 0; i < 16; i++) {
+            if (seq_get_gate_enabled(i)) current_gate_mask |= (1 << i);
+        }
+        
         if (ui_edit_step_prev_step != (int32_t)selected_step) {
             int old_col = ui_edit_step_prev_step % cols;
             int old_row = ui_edit_step_prev_step / cols;
@@ -540,7 +548,7 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
             int old_y = (old_row == 0) ? top_y : bottom_y;
             clear_region(old_x, old_y, sq, sq);
             bool old_gate = seq_get_gate_enabled(ui_edit_step_prev_step);
-            draw_rect_outline(old_x + 1, old_y + 1, sq - 2, sq - 2);
+            draw_rect_outline(old_x + 2, old_y + 2, sq - 4, sq - 4);
             if (old_gate) {
                 fill_rect(old_x + 4, old_y + 4, 4, 4);
             }
@@ -555,7 +563,20 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
             if (new_gate) {
                 fill_rect(new_x + 3, new_y + 3, 6, 6);
             }
+        } else if (current_gate_mask != ui_edit_step_prev_gate) {
+            int col = selected_step % cols;
+            int row = selected_step / cols;
+            int x = left + col * (sq + spacing);
+            int y = (row == 0) ? top_y : bottom_y;
+            clear_region(x, y, sq, sq);
+            bool gate = seq_get_gate_enabled(selected_step);
+            draw_rect_outline(x, y, sq, sq);
+            if (gate) {
+                fill_rect(x + 3, y + 3, 6, 6);
+            }
         }
+        
+        ui_edit_step_prev_gate = current_gate_mask;
     }
     
     char buf[32];
@@ -564,8 +585,10 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
     sprintf(buf, "Step:%02d  Note:%s", selected_step + 1, note_str);
     ui_draw_text(0, 2, buf);
     
-    ui_edit_step_prev_step = selected_step;
-    ui_edit_step_prev_note = note;
+    if (!first_draw) {
+        ui_edit_step_prev_step = selected_step;
+        ui_edit_step_prev_note = note;
+    }
     
     ssd1306_update();
 }
@@ -613,17 +636,32 @@ void ui_show_edit_note(uint32_t step, uint8_t note) {
 }
 
 void ui_show_pattern_select(uint8_t slot) {
-    ssd1306_clear_fb();
+    bool first_draw = (ui_pattern_select_prev_slot == -1);
     
-    // Title (centered)
-    ui_draw_text(22, 0, "PATTERN SELECT");
+    if (first_draw) {
+        clear_region(0, 0, 128, 64);
+        ui_draw_text(22, 0, "PATTERN SELECT");
+        ui_draw_text(36, 7, "LOAD/SAVE");
+    }
     
-    // Slot number large and centered (3x scale, centered vertically and horizontally)
+    if (first_draw || ui_pattern_select_prev_slot != (int8_t)slot) {
+        clear_region(48, 16, 32, 32);
+        char slot_char = '0' + slot;
+        draw_scaled_char(56, 24, slot_char, 3);
+    }
+    
+    ui_pattern_select_prev_slot = slot;
+    ssd1306_update();
+}
+
+void ui_pattern_select_blink_confirm(uint8_t slot) {
+    // Clear number area
+    clear_region(48, 16, 32, 32);
+    ssd1306_update();
+    sleep_ms(150);
+    
+    // Redraw number
     char slot_char = '0' + slot;
-    draw_scaled_char(56, 24, slot_char, 3);  // Vertically centered
-    
-    // Instructions
-    ui_draw_text(36, 7, "LOAD/SAVE");
-    
+    draw_scaled_char(56, 24, slot_char, 3);
     ssd1306_update();
 }

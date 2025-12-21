@@ -150,6 +150,19 @@ void seq_save_pattern(uint8_t slot) {
     }
 }
 
+void seq_save_pattern_ram_only(uint8_t slot) {
+    if (slot >= NUM_PATTERN_SLOTS) return;
+    memcpy(pattern_storage[slot], state.notes, PATTERN_SIZE);
+    gate_mask_storage[slot] = state.gate_mask;
+}
+
+void seq_flush_all_patterns_to_eeprom() {
+    if (!eeprom_is_initialized()) return;
+    for (int i = 0; i < NUM_PATTERN_SLOTS; i++) {
+        eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i]);
+    }
+}
+
 void seq_load_pattern(uint8_t slot) {
     if (slot >= NUM_PATTERN_SLOTS) return;
     

@@ -9,12 +9,10 @@ namespace {
 constexpr uint8_t EEPROM_BASE_ADDR = 0x50;
 constexpr uint SDA_PIN = 26;
 constexpr uint SCL_PIN = 27;
-constexpr uint8_t PATTERN_SIZE = 16;
 constexpr uint8_t PATTERN_STORAGE_SIZE = 18;
 constexpr uint8_t NUM_PATTERNS = 10;
 constexpr uint8_t MAGIC_BYTE = 0xAA;
 constexpr uint16_t MAGIC_ADDR = 1900;
-constexpr uint16_t BLOCK_SIZE = 256;
 
 bool initialized = false;
 }
