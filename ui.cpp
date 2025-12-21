@@ -13,7 +13,14 @@ static const int SCL_PIN = 5;
 static const uint8_t SSD1306_ADDR = 0x3C;
 
 // 128x64 framebuffer (pages of 8 rows)
-static uint8_t fb[128 * 8]; // 1024 bytes
+static uint8_t fb[128 * 8];
+
+// Edit screen cache variables
+static int32_t ui_edit_step_prev_step = -1;
+static uint8_t ui_edit_step_prev_note = 0;
+static uint8_t ui_edit_note_prev_note = 255;
+static bool ui_edit_note_prev_gate = false;
+static uint32_t ui_edit_note_prev_step = 255; // 1024 bytes
 
 // Minimal 5x7 font for digits and few letters
 static const uint8_t font5x7[][5] = {
@@ -183,8 +190,7 @@ static void draw_scaled_char(int x0, int y0, char c, int scale) {
 }
 
 void ui_init() {
-    // init i2c0 with default 400kHz
-    i2c_init(i2c0, 400000);
+    i2c_init(i2c0, 1000000);
     gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
     gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(SDA_PIN);
@@ -290,6 +296,12 @@ void ui_boot_animation() {
 void ui_clear() {
     ssd1306_clear_fb();
     ssd1306_update();
+    
+    ui_edit_step_prev_step = -1;
+    ui_edit_step_prev_note = 0;
+    ui_edit_note_prev_note = 255;
+    ui_edit_note_prev_gate = false;
+    ui_edit_note_prev_step = 255;
 }
 
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, bool blink_slot) {
@@ -484,19 +496,6 @@ static void note_to_string(uint8_t note, char *buf) {
 }
 
 void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
-    ssd1306_clear_fb();
-    
-    // Title
-    ui_draw_text(0, 0, "STEP SELECT");
-    
-    // Step and Note on same line
-    char buf[32];
-    char note_str[8];
-    note_to_string(note, note_str);
-    sprintf(buf, "Step:%02d  Note:%s", selected_step + 1, note_str);
-    ui_draw_text(0, 2, buf);
-    
-    // Draw step grid with highlight and gate indicators (larger squares)
     const int cols = 8;
     const int sq = 12;
     const int spacing = 4;
@@ -505,55 +504,110 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
     const int bottom_y = 64 - sq;
     const int top_y = bottom_y - sq - 8;
     
-    for (int i = 0; i < 16; ++i) {
-        int col = i % cols;
-        int row = i / cols;
-        int x = left + col * (sq + spacing);
-        int step_y = (row == 0) ? top_y : bottom_y;
+    bool first_draw = (ui_edit_step_prev_step == -1);
+    
+    if (first_draw) {
+        ssd1306_clear_fb();
+        ui_draw_text(0, 0, "STEP SELECT");
         
-        bool is_selected = (i == (int)selected_step);
-        bool gate_enabled = seq_get_gate_enabled(i);
-        
-        if (is_selected) {
-            draw_rect_outline(x, step_y, sq, sq);
-            if (gate_enabled) {
-                fill_rect(x + 3, step_y + 3, 6, 6);
+        for (int i = 0; i < 16; ++i) {
+            int col = i % cols;
+            int row = i / cols;
+            int x = left + col * (sq + spacing);
+            int step_y = (row == 0) ? top_y : bottom_y;
+            bool is_selected = (i == (int)selected_step);
+            bool gate_enabled = seq_get_gate_enabled(i);
+            
+            if (is_selected) {
+                draw_rect_outline(x, step_y, sq, sq);
+                if (gate_enabled) {
+                    fill_rect(x + 3, step_y + 3, 6, 6);
+                }
+            } else {
+                draw_rect_outline(x + 1, step_y + 1, sq - 2, sq - 2);
+                if (gate_enabled) {
+                    fill_rect(x + 4, step_y + 4, 4, 4);
+                }
             }
-        } else {
-            draw_rect_outline(x + 1, step_y + 1, sq - 2, sq - 2);
-            if (gate_enabled) {
-                fill_rect(x + 4, step_y + 4, 4, 4);
+        }
+    } else {
+        clear_region(0, 16, 128, 8);
+        
+        if (ui_edit_step_prev_step != (int32_t)selected_step) {
+            int old_col = ui_edit_step_prev_step % cols;
+            int old_row = ui_edit_step_prev_step / cols;
+            int old_x = left + old_col * (sq + spacing);
+            int old_y = (old_row == 0) ? top_y : bottom_y;
+            clear_region(old_x, old_y, sq, sq);
+            bool old_gate = seq_get_gate_enabled(ui_edit_step_prev_step);
+            draw_rect_outline(old_x + 1, old_y + 1, sq - 2, sq - 2);
+            if (old_gate) {
+                fill_rect(old_x + 4, old_y + 4, 4, 4);
+            }
+            
+            int new_col = selected_step % cols;
+            int new_row = selected_step / cols;
+            int new_x = left + new_col * (sq + spacing);
+            int new_y = (new_row == 0) ? top_y : bottom_y;
+            clear_region(new_x, new_y, sq, sq);
+            bool new_gate = seq_get_gate_enabled(selected_step);
+            draw_rect_outline(new_x, new_y, sq, sq);
+            if (new_gate) {
+                fill_rect(new_x + 3, new_y + 3, 6, 6);
             }
         }
     }
+    
+    char buf[32];
+    char note_str[8];
+    note_to_string(note, note_str);
+    sprintf(buf, "Step:%02d  Note:%s", selected_step + 1, note_str);
+    ui_draw_text(0, 2, buf);
+    
+    ui_edit_step_prev_step = selected_step;
+    ui_edit_step_prev_note = note;
     
     ssd1306_update();
 }
 
 void ui_show_edit_note(uint32_t step, uint8_t note) {
-    ssd1306_clear_fb();
-    
-    // Title
-    ui_draw_text(0, 0, "NOTE EDIT");
-    
-    // Step number (1-16)
-    char buf[32];
-    sprintf(buf, "Step: %02d", step + 1);
-    ui_draw_text(0, 2, buf);
-    
-    // Gate status (with spacing)
     bool gate_on = seq_get_gate_enabled(step);
-    sprintf(buf, "Gate: %s", gate_on ? "ON" : "OFF");
-    ui_draw_text(0, 4, buf);
+    bool first_draw = (ui_edit_note_prev_note == 255);
     
-    // Note name (large, centered, 2x scale, lower)
-    char note_str[8];
-    note_to_string(note, note_str);
-    sprintf(buf, ">> %s <<", note_str);
+    if (first_draw) {
+        ssd1306_clear_fb();
+        ui_draw_text(0, 0, "NOTE EDIT");
+    }
     
-    int text_width = strlen(buf) * 6 * 2;
-    int center_x = (128 - text_width) / 2;
-    draw_scaled_text(center_x, 47, buf, 2);
+    if (first_draw || ui_edit_note_prev_step != step) {
+        clear_region(0, 16, 128, 8);
+        char buf[32];
+        sprintf(buf, "Step: %02d", step + 1);
+        ui_draw_text(0, 2, buf);
+    }
+    
+    if (first_draw || ui_edit_note_prev_gate != gate_on) {
+        clear_region(0, 32, 128, 8);
+        char buf[32];
+        sprintf(buf, "Gate: %s", gate_on ? "ON" : "OFF");
+        ui_draw_text(0, 4, buf);
+    }
+    
+    if (first_draw || ui_edit_note_prev_note != note) {
+        clear_region(0, 40, 128, 24);
+        char buf[32];
+        char note_str[8];
+        note_to_string(note, note_str);
+        sprintf(buf, ">> %s <<", note_str);
+        
+        int text_width = strlen(buf) * 6 * 2;
+        int center_x = (128 - text_width) / 2;
+        draw_scaled_text(center_x, 47, buf, 2);
+    }
+    
+    ui_edit_note_prev_note = note;
+    ui_edit_note_prev_gate = gate_on;
+    ui_edit_note_prev_step = step;
     
     ssd1306_update();
 }
