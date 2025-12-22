@@ -20,6 +20,9 @@ bool io_poll_load_button();
 // Returns true when stop button (GP7) was pressed (debounced, edge-triggered).
 bool io_poll_stop_button();
 
+// Returns true when step button (GP8) is currently pressed (held down).
+bool io_is_step_button_pressed();
+
 // Start LED blink (non-blocking)
 void io_blink_led_start();
 

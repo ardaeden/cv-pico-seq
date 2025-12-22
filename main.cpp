@@ -171,14 +171,23 @@ int main() {
                 ui_show_pattern_select(temp_pattern_slot);
                 
             } else {
-                uint32_t current_bpm = seq_get_bpm();
-                int new_bpm = (int)current_bpm + encoder_delta * encoder_step;
-                if (new_bpm < 20) new_bpm = 20;
-                if (new_bpm > 300) new_bpm = 300;
-                
-                seq_set_bpm((uint32_t)new_bpm);
-                clock_set_bpm((uint32_t)new_bpm);
-                ui_show_bpm((uint32_t)new_bpm, pattern_slot);
+                if (io_is_step_button_pressed()) {
+                    uint32_t current_steps = seq_get_steps();
+                    int new_steps = (int)current_steps + encoder_delta;
+                    if (new_steps < 1) new_steps = 1;
+                    if (new_steps > 16) new_steps = 16;
+                    seq_set_steps((uint32_t)new_steps);
+                    ui_show_steps(seq_is_playing() ? seq_current_step() : 16, (uint32_t)new_steps);
+                } else {
+                    uint32_t current_bpm = seq_get_bpm();
+                    int new_bpm = (int)current_bpm + encoder_delta * encoder_step;
+                    if (new_bpm < 20) new_bpm = 20;
+                    if (new_bpm > 300) new_bpm = 300;
+                    
+                    seq_set_bpm((uint32_t)new_bpm);
+                    clock_set_bpm((uint32_t)new_bpm);
+                    ui_show_bpm((uint32_t)new_bpm, pattern_slot);
+                }
             }
         }
 

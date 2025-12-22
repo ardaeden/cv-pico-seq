@@ -19,6 +19,7 @@ void seq_set_bpm(uint32_t bpm);
 
 // Return number of steps in the sequence
 uint32_t seq_get_steps();
+void seq_set_steps(uint32_t steps);
 
 // Note operations (MIDI note numbers 0-127)
 uint8_t seq_get_note(uint32_t step);

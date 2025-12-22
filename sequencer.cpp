@@ -42,7 +42,7 @@ bool seq_toggle_play() {
 
 void seq_stop() {
     state.playing.store(false);
-    state.current_step = 15;
+    state.current_step = (state.steps > 0) ? (state.steps - 1) : 15;
 }
 
 bool seq_is_playing() {
@@ -76,6 +76,12 @@ void seq_set_bpm(uint32_t new_bpm) {
 
 uint32_t seq_get_steps() {
     return state.steps;
+}
+
+void seq_set_steps(uint32_t steps) {
+    if (steps < 1) steps = 1;
+    if (steps > 16) steps = 16;
+    state.steps = steps;
 }
 
 uint8_t seq_get_note(uint32_t step) {

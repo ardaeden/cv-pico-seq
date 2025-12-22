@@ -8,6 +8,7 @@
 namespace {
 constexpr uint BUTTON_PIN = 2;            // GP2 - Play/Pause button
 constexpr uint STOP_BUTTON_PIN = 7;       // GP7 - Stop button
+constexpr uint STEP_BUTTON_PIN = 8;       // GP8 - Step count button
 constexpr uint EDIT_BUTTON_PIN = 10;      // GP10 - Edit mode button
 constexpr uint SAVE_BUTTON_PIN = 11;      // GP11 - Save pattern button
 constexpr uint LOAD_BUTTON_PIN = 12;      // GP12 - Load pattern button
@@ -59,6 +60,10 @@ void io_init() {
     gpio_set_dir(STOP_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(STOP_BUTTON_PIN);
     stop_button_prev = gpio_get(STOP_BUTTON_PIN);
+
+    gpio_init(STEP_BUTTON_PIN);
+    gpio_set_dir(STEP_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(STEP_BUTTON_PIN);
 
     gpio_init(EDIT_BUTTON_PIN);
     gpio_set_dir(EDIT_BUTTON_PIN, GPIO_IN);
@@ -142,6 +147,10 @@ bool io_poll_stop_button() {
         }
     }
     return false;
+}
+
+bool io_is_step_button_pressed() {
+    return !gpio_get(STEP_BUTTON_PIN);
 }
 
 void io_blink_led_start() {
