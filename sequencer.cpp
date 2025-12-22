@@ -114,7 +114,10 @@ void seq_toggle_gate(uint32_t step) {
 void seq_init_flash() {
     eeprom_init();
     
-    if (eeprom_is_initialized() && eeprom_has_valid_data()) {
+    // GEÇICI: EEPROM'u zorla sıfırla - yeni patternleri yüklemek için
+    bool force_reset = false;  // Bu satırı sonra false yap veya sil
+    
+    if (eeprom_is_initialized() && eeprom_has_valid_data() && !force_reset) {
         for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
             eeprom_read_pattern(i, pattern_storage[i], &gate_mask_storage[i], &steps_storage[i]);
             if (steps_storage[i] < 1 || steps_storage[i] > 16) {
@@ -122,16 +125,35 @@ void seq_init_flash() {
             }
         }
     } else {
-        uint8_t pattern0[16] = {48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74};
-        uint8_t pattern1[16] = {48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74};
-        uint8_t pattern2[16] = {48, 50, 52, 55, 57, 60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84};
-        uint8_t pattern3[16] = {48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63};
-        uint8_t pattern4[16] = {48, 52, 55, 60, 64, 67, 72, 76, 79, 84, 79, 76, 72, 67, 64, 60};
-        uint8_t pattern5[16] = {48, 60, 48, 60, 50, 62, 50, 62, 52, 64, 52, 64, 53, 65, 53, 65};
-        uint8_t pattern6[16] = {36, 36, 43, 36, 36, 36, 43, 36, 38, 38, 45, 38, 36, 36, 43, 48};
-        uint8_t pattern7[16] = {84, 83, 81, 79, 77, 76, 74, 72, 71, 69, 67, 65, 64, 62, 60, 48};
-        uint8_t pattern8[16] = {48, 55, 50, 57, 52, 59, 53, 60, 55, 62, 57, 64, 59, 65, 60, 67};
-        uint8_t pattern9[16] = {60, 62, 67, 65, 69, 64, 72, 60, 64, 67, 71, 69, 74, 72, 67, 60};
+        // Pattern 0: C Major Scale (C3 to C4)
+        uint8_t pattern0[16] = {48, 50, 52, 53, 55, 57, 59, 60, 59, 57, 55, 53, 52, 50, 48, 60};
+        
+        // Pattern 1: Minor Arpeggio (Am)
+        uint8_t pattern1[16] = {57, 60, 64, 69, 64, 60, 57, 69, 57, 60, 64, 69, 72, 69, 64, 60};
+        
+        // Pattern 2: Pentatonic Sequence
+        uint8_t pattern2[16] = {60, 62, 65, 67, 70, 72, 70, 67, 65, 62, 60, 67, 65, 70, 62, 72};
+        
+        // Pattern 3: Bass Line (Techno Style)
+        uint8_t pattern3[16] = {36, 48, 36, 43, 36, 48, 40, 36, 38, 50, 38, 45, 38, 50, 43, 38};
+        
+        // Pattern 4: Octave Jump Pattern
+        uint8_t pattern4[16] = {48, 60, 50, 62, 52, 64, 53, 65, 55, 67, 57, 69, 59, 71, 60, 72};
+        
+        // Pattern 5: Chord Progression (C-F-G-Am)
+        uint8_t pattern5[16] = {48, 52, 55, 60, 53, 57, 60, 65, 55, 59, 62, 67, 57, 60, 64, 69};
+        
+        // Pattern 6: Ambient Pad
+        uint8_t pattern6[16] = {60, 64, 67, 72, 67, 64, 60, 72, 62, 65, 69, 74, 69, 65, 62, 74};
+        
+        // Pattern 7: Chromatic Walk
+        uint8_t pattern7[16] = {60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 71, 70, 69};
+        
+        // Pattern 8: Melodic Sequence (Uplifting)
+        uint8_t pattern8[16] = {60, 64, 67, 72, 64, 67, 72, 76, 67, 72, 76, 79, 72, 76, 79, 84};
+        
+        // Pattern 9: Rhythmic Pattern (Hi-Low)
+        uint8_t pattern9[16] = {72, 48, 72, 60, 74, 50, 74, 62, 76, 52, 76, 64, 77, 53, 77, 65};
         
         memcpy(pattern_storage[0], pattern0, PATTERN_SIZE);
         memcpy(pattern_storage[1], pattern1, PATTERN_SIZE);

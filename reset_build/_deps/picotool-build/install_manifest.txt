@@ -1,0 +1,7 @@
+/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool/picotool
+/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool/picotoolTargets.cmake
+/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool/picotoolTargets-release.cmake
+/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool/picotoolConfig.cmake
+/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool/picotoolConfigVersion.cmake
+/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool/enc_bootloader.elf
+/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool/enc_bootloader_mbedtls.elf

@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.13)
+
+include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+
+project(eeprom_reset C CXX ASM)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+
+pico_sdk_init()
+
+add_executable(eeprom_reset ../eeprom_reset.cpp)
+
+target_link_libraries(eeprom_reset 
+    pico_stdlib
+    hardware_i2c
+)
+
+pico_enable_stdio_usb(eeprom_reset 1)
+pico_enable_stdio_uart(eeprom_reset 0)
+
+pico_add_extra_outputs(eeprom_reset)
