@@ -49,23 +49,35 @@ int main() {
         }
 
         if (io_poll_play_toggle()) {
+            bool was_playing = seq_is_playing();
             bool is_playing = seq_toggle_play();
             
             if (is_playing) {
-                bool first_gate = seq_get_gate_enabled(0);
+                uint32_t start_step = seq_current_step() + 1;
+                if (start_step >= seq_get_steps()) start_step = 0;
+                bool first_gate = seq_get_gate_enabled(start_step);
                 clock_gate_enable(first_gate);
             } else {
                 clock_gate_enable(false);
+                if (was_playing && seq_has_dirty_patterns()) {
+                    seq_flush_all_patterns_to_eeprom();
+                }
+            }
+        }
+
+        if (io_poll_stop_button()) {
+            seq_stop();
+            clock_gate_enable(false);
+            
+            if (seq_has_dirty_patterns()) {
                 seq_flush_all_patterns_to_eeprom();
             }
             
-            if (!is_playing) {
-                if (edit_mode == EDIT_NONE) {
-                    ui_show_bpm(seq_get_bpm(), pattern_slot);
-                    ui_show_steps(16, seq_get_steps());
-                } else if (edit_mode == PATTERN_SELECT) {
-                    ui_show_pattern_select(temp_pattern_slot);
-                }
+            if (edit_mode == EDIT_NONE) {
+                ui_show_bpm(seq_get_bpm(), pattern_slot);
+                ui_show_steps(16, seq_get_steps());
+            } else if (edit_mode == PATTERN_SELECT) {
+                ui_show_pattern_select(temp_pattern_slot);
             }
         }
 
@@ -181,10 +193,9 @@ int main() {
             }
         } else if (edit_mode == PATTERN_SELECT) {
             if (io_poll_load_button()) {
-                if (seq_is_playing()) {
-                    seq_save_pattern_ram_only(temp_pattern_slot);
-                } else {
-                    seq_save_pattern(temp_pattern_slot);
+                seq_save_pattern_ram_only(temp_pattern_slot);
+                if (!seq_is_playing()) {
+                    seq_flush_all_patterns_to_eeprom();
                 }
                 pattern_slot = temp_pattern_slot;
                 

@@ -6,6 +6,7 @@ void seq_init();
 
 // Play state helpers
 bool seq_toggle_play();
+void seq_stop();
 bool seq_is_playing();
 
 // Step operations
@@ -31,6 +32,7 @@ void seq_toggle_gate(uint32_t step);
 void seq_save_pattern(uint8_t slot);
 void seq_save_pattern_ram_only(uint8_t slot);
 void seq_flush_all_patterns_to_eeprom();
+bool seq_has_dirty_patterns();
 void seq_load_pattern(uint8_t slot);
 void seq_queue_pattern(uint8_t slot);
 int8_t seq_get_pending_pattern();

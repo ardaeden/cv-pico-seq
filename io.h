@@ -17,6 +17,9 @@ bool io_poll_save_button();
 // Returns true when load button (GP12) was pressed (debounced, edge-triggered).
 bool io_poll_load_button();
 
+// Returns true when stop button (GP7) was pressed (debounced, edge-triggered).
+bool io_poll_stop_button();
+
 // Start LED blink (non-blocking)
 void io_blink_led_start();
 

@@ -6,7 +6,8 @@
 #include "pico/time.h"
 
 namespace {
-constexpr uint BUTTON_PIN = 2;            // GP2 - Play button
+constexpr uint BUTTON_PIN = 2;            // GP2 - Play/Pause button
+constexpr uint STOP_BUTTON_PIN = 7;       // GP7 - Stop button
 constexpr uint EDIT_BUTTON_PIN = 10;      // GP10 - Edit mode button
 constexpr uint SAVE_BUTTON_PIN = 11;      // GP11 - Save pattern button
 constexpr uint LOAD_BUTTON_PIN = 12;      // GP12 - Load pattern button
@@ -30,6 +31,9 @@ uint64_t last_save_button_event_us = 0;
 bool load_button_prev = true;
 uint64_t last_load_button_event_us = 0;
 
+bool stop_button_prev = true;
+uint64_t last_stop_button_event_us = 0;
+
 bool encoder_sw_prev = true;
 uint64_t last_encoder_sw_event_us = 0;
 
@@ -49,18 +53,27 @@ void io_init() {
     gpio_init(BUTTON_PIN);
     gpio_set_dir(BUTTON_PIN, GPIO_IN);
     gpio_pull_up(BUTTON_PIN);
+    button_prev = gpio_get(BUTTON_PIN);
+
+    gpio_init(STOP_BUTTON_PIN);
+    gpio_set_dir(STOP_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(STOP_BUTTON_PIN);
+    stop_button_prev = gpio_get(STOP_BUTTON_PIN);
 
     gpio_init(EDIT_BUTTON_PIN);
     gpio_set_dir(EDIT_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(EDIT_BUTTON_PIN);
+    edit_button_prev = gpio_get(EDIT_BUTTON_PIN);
 
     gpio_init(SAVE_BUTTON_PIN);
     gpio_set_dir(SAVE_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(SAVE_BUTTON_PIN);
+    save_button_prev = gpio_get(SAVE_BUTTON_PIN);
 
     gpio_init(LOAD_BUTTON_PIN);
     gpio_set_dir(LOAD_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(LOAD_BUTTON_PIN);
+    load_button_prev = gpio_get(LOAD_BUTTON_PIN);
 
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
@@ -111,6 +124,19 @@ bool io_poll_load_button() {
     if (button_now != load_button_prev && (now_us - last_load_button_event_us) >= DEBOUNCE_US) {
         load_button_prev = button_now;
         last_load_button_event_us = now_us;
+        if (!button_now) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool io_poll_stop_button() {
+    bool button_now = gpio_get(STOP_BUTTON_PIN);
+    uint64_t now_us = time_us_64();
+    if (button_now != stop_button_prev && (now_us - last_stop_button_event_us) >= DEBOUNCE_US) {
+        stop_button_prev = button_now;
+        last_stop_button_event_us = now_us;
         if (!button_now) {
             return true;
         }

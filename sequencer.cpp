@@ -11,6 +11,7 @@ constexpr uint8_t PATTERN_SIZE = 16;
 
 uint8_t pattern_storage[NUM_PATTERN_SLOTS][PATTERN_SIZE] = {0};
 uint16_t gate_mask_storage[NUM_PATTERN_SLOTS] = {0};
+bool pattern_dirty[NUM_PATTERN_SLOTS] = {false};
 int8_t pending_pattern_slot = -1;
 
 struct SequencerState {
@@ -36,11 +37,12 @@ void seq_init() {
 bool seq_toggle_play() {
     bool expected = state.playing.load();
     while (!state.playing.compare_exchange_weak(expected, !expected)) {}
-    bool is_playing = !expected;
-    if (!is_playing) {
-        state.current_step = 15;
-    }
-    return is_playing;
+    return !expected;
+}
+
+void seq_stop() {
+    state.playing.store(false);
+    state.current_step = 15;
 }
 
 bool seq_is_playing() {
@@ -154,13 +156,31 @@ void seq_save_pattern_ram_only(uint8_t slot) {
     if (slot >= NUM_PATTERN_SLOTS) return;
     memcpy(pattern_storage[slot], state.notes, PATTERN_SIZE);
     gate_mask_storage[slot] = state.gate_mask;
+    pattern_dirty[slot] = true;
 }
 
 void seq_flush_all_patterns_to_eeprom() {
     if (!eeprom_is_initialized()) return;
+    bool any_written = false;
     for (int i = 0; i < NUM_PATTERN_SLOTS; i++) {
-        eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i]);
+        if (pattern_dirty[i]) {
+            eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i]);
+            pattern_dirty[i] = false;
+            any_written = true;
+        }
     }
+    if (any_written && !eeprom_has_valid_data()) {
+        eeprom_mark_valid();
+    }
+}
+
+bool seq_has_dirty_patterns() {
+    for (int i = 0; i < NUM_PATTERN_SLOTS; i++) {
+        if (pattern_dirty[i]) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void seq_load_pattern(uint8_t slot) {
