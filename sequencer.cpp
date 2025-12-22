@@ -114,10 +114,7 @@ void seq_toggle_gate(uint32_t step) {
 void seq_init_flash() {
     eeprom_init();
     
-    // GEÇICI: EEPROM'u zorla sıfırla - yeni patternleri yüklemek için
-    bool force_reset = false;  // Bu satırı sonra false yap veya sil
-    
-    if (eeprom_is_initialized() && eeprom_has_valid_data() && !force_reset) {
+    if (eeprom_is_initialized() && eeprom_has_valid_data()) {
         for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
             eeprom_read_pattern(i, pattern_storage[i], &gate_mask_storage[i], &steps_storage[i]);
             if (steps_storage[i] < 1 || steps_storage[i] > 16) {

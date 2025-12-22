@@ -1,1 +1,6 @@
 build/
+reset_build/
+eeprom_reset.cpp
+eeprom_reset_CMakeLists.txt
+*.dis
+*.uf2

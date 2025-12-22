@@ -90,7 +90,7 @@ int main() {
                 edit_mode = EDIT_NONE;
                 ui_clear();
                 ui_show_bpm(seq_get_bpm(), pattern_slot);
-                ui_show_steps(16, seq_get_steps());
+                ui_show_steps(seq_current_step(), seq_get_steps());
             } else if (edit_mode == PATTERN_SELECT) {
                 edit_mode = EDIT_SELECT_STEP;
                 edit_step = 0;

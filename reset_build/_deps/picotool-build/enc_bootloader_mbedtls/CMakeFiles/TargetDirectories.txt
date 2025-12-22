@@ -1,2 +1,0 @@
-/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool-build/enc_bootloader_mbedtls/CMakeFiles/edit_cache.dir
-/home/bowman/pico/dev/cv-pico-seq/reset_build/_deps/picotool-build/enc_bootloader_mbedtls/CMakeFiles/rebuild_cache.dir
