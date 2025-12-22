@@ -75,7 +75,7 @@ int main() {
             
             if (edit_mode == EDIT_NONE) {
                 ui_show_bpm(seq_get_bpm(), pattern_slot);
-                ui_show_steps(16, seq_get_steps());
+                ui_show_steps(seq_get_steps(), seq_get_steps());
             } else if (edit_mode == PATTERN_SELECT) {
                 ui_show_pattern_select(temp_pattern_slot);
             }
@@ -112,7 +112,7 @@ int main() {
                 if (!seq_is_playing()) {
                     ui_clear();
                     ui_show_bpm(seq_get_bpm(), pattern_slot);
-                    ui_show_steps(16, seq_get_steps());
+                    ui_show_steps(seq_get_steps(), seq_get_steps());
                 } else {
                     ui_clear();
                     ui_show_bpm(seq_get_bpm(), pattern_slot);
@@ -140,7 +140,7 @@ int main() {
                 edit_mode = EDIT_NONE;
                 ui_clear();
                 ui_show_bpm(seq_get_bpm(), pattern_slot);
-                ui_show_steps(seq_is_playing() ? seq_current_step() : 16, seq_get_steps());
+                ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(), seq_get_steps());
             } else {
                 encoder_step = (encoder_step == 1) ? 10 : 1;
             }

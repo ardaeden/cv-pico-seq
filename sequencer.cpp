@@ -11,6 +11,7 @@ constexpr uint8_t PATTERN_SIZE = 16;
 
 uint8_t pattern_storage[NUM_PATTERN_SLOTS][PATTERN_SIZE] = {0};
 uint16_t gate_mask_storage[NUM_PATTERN_SLOTS] = {0};
+uint8_t steps_storage[NUM_PATTERN_SLOTS] = {0};
 bool pattern_dirty[NUM_PATTERN_SLOTS] = {false};
 int8_t pending_pattern_slot = -1;
 
@@ -51,12 +52,17 @@ bool seq_is_playing() {
 
 void seq_advance_step() {
     uint32_t prev_step = state.current_step;
-    state.current_step = (state.current_step + 1) % (state.steps ? state.steps : 16);
+    uint32_t steps = state.steps ? state.steps : 16;
+    state.current_step = (state.current_step + 1) % steps;
     
-    if (prev_step == 15 && state.current_step == 0 && pending_pattern_slot >= 0) {
+    if (prev_step == (steps - 1) && state.current_step == 0 && pending_pattern_slot >= 0) {
         if (pending_pattern_slot < NUM_PATTERN_SLOTS) {
             memcpy(state.notes, pattern_storage[pending_pattern_slot], PATTERN_SIZE);
             state.gate_mask = gate_mask_storage[pending_pattern_slot];
+            state.steps = steps_storage[pending_pattern_slot];
+            if (state.steps < 1 || state.steps > 16) {
+                state.steps = 16;
+            }
         }
         pending_pattern_slot = -1;
     }
@@ -110,7 +116,10 @@ void seq_init_flash() {
     
     if (eeprom_is_initialized() && eeprom_has_valid_data()) {
         for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
-            eeprom_read_pattern(i, pattern_storage[i], &gate_mask_storage[i]);
+            eeprom_read_pattern(i, pattern_storage[i], &gate_mask_storage[i], &steps_storage[i]);
+            if (steps_storage[i] < 1 || steps_storage[i] > 16) {
+                steps_storage[i] = 16;
+            }
         }
     } else {
         uint8_t pattern0[16] = {48, 50, 52, 53, 55, 57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74};
@@ -137,11 +146,12 @@ void seq_init_flash() {
         
         for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
             gate_mask_storage[i] = 0xFFFF;
+            steps_storage[i] = 16;
         }
         
         if (eeprom_is_initialized()) {
             for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
-                eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i]);
+                eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i], steps_storage[i]);
             }
             eeprom_mark_valid();
         }
@@ -152,9 +162,10 @@ void seq_save_pattern(uint8_t slot) {
     if (slot >= NUM_PATTERN_SLOTS) return;
     memcpy(pattern_storage[slot], state.notes, PATTERN_SIZE);
     gate_mask_storage[slot] = state.gate_mask;
+    steps_storage[slot] = (uint8_t)state.steps;
     
     if (eeprom_is_initialized()) {
-        eeprom_write_pattern(slot, state.notes, state.gate_mask);
+        eeprom_write_pattern(slot, state.notes, state.gate_mask, (uint8_t)state.steps);
     }
 }
 
@@ -162,6 +173,7 @@ void seq_save_pattern_ram_only(uint8_t slot) {
     if (slot >= NUM_PATTERN_SLOTS) return;
     memcpy(pattern_storage[slot], state.notes, PATTERN_SIZE);
     gate_mask_storage[slot] = state.gate_mask;
+    steps_storage[slot] = (uint8_t)state.steps;
     pattern_dirty[slot] = true;
 }
 
@@ -170,7 +182,7 @@ void seq_flush_all_patterns_to_eeprom() {
     bool any_written = false;
     for (int i = 0; i < NUM_PATTERN_SLOTS; i++) {
         if (pattern_dirty[i]) {
-            eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i]);
+            eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i], steps_storage[i]);
             pattern_dirty[i] = false;
             any_written = true;
         }
@@ -194,6 +206,11 @@ void seq_load_pattern(uint8_t slot) {
     
     memcpy(state.notes, pattern_storage[slot], PATTERN_SIZE);
     state.gate_mask = gate_mask_storage[slot];
+    state.steps = steps_storage[slot];
+    if (state.steps < 1 || state.steps > 16) {
+        state.steps = 16;
+    }
+    state.current_step = (state.steps > 0) ? (state.steps - 1) : 15;
 }
 
 void seq_queue_pattern(uint8_t slot) {

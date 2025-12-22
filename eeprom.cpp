@@ -9,7 +9,7 @@ namespace {
 constexpr uint8_t EEPROM_BASE_ADDR = 0x50;
 constexpr uint SDA_PIN = 26;
 constexpr uint SCL_PIN = 27;
-constexpr uint8_t PATTERN_STORAGE_SIZE = 18;
+constexpr uint8_t PATTERN_STORAGE_SIZE = 19;
 constexpr uint8_t NUM_PATTERNS = 10;
 constexpr uint8_t MAGIC_BYTE = 0xAA;
 constexpr uint16_t MAGIC_ADDR = 1900;
@@ -39,7 +39,7 @@ bool eeprom_is_initialized() {
     return initialized;
 }
 
-void eeprom_write_pattern(uint8_t slot, const uint8_t* notes, uint16_t gate_mask) {
+void eeprom_write_pattern(uint8_t slot, const uint8_t* notes, uint16_t gate_mask, uint8_t steps) {
     if (!initialized || slot >= NUM_PATTERNS) return;
     
     uint16_t addr = slot * PATTERN_STORAGE_SIZE;
@@ -67,9 +67,16 @@ void eeprom_write_pattern(uint8_t slot, const uint8_t* notes, uint16_t gate_mask
     uint8_t buf2[2] = {gate_local_addr, (uint8_t)(gate_mask & 0xFF)};
     i2c_write_blocking(i2c1, gate_i2c_addr, buf2, 2, false);
     sleep_ms(5);
+    
+    uint16_t steps_addr = addr + 18;
+    uint8_t steps_i2c_addr = EEPROM_BASE_ADDR | ((steps_addr >> 8) & 0x07);
+    uint8_t steps_local_addr = steps_addr & 0xFF;
+    uint8_t buf3[2] = {steps_local_addr, steps};
+    i2c_write_blocking(i2c1, steps_i2c_addr, buf3, 2, false);
+    sleep_ms(5);
 }
 
-void eeprom_read_pattern(uint8_t slot, uint8_t* notes, uint16_t* gate_mask) {
+void eeprom_read_pattern(uint8_t slot, uint8_t* notes, uint16_t* gate_mask, uint8_t* steps) {
     if (!initialized || slot >= NUM_PATTERNS) return;
     
     uint16_t addr = slot * PATTERN_STORAGE_SIZE;
@@ -88,6 +95,13 @@ void eeprom_read_pattern(uint8_t slot, uint8_t* notes, uint16_t* gate_mask) {
     uint8_t gate_data[2];
     i2c_read_blocking(i2c1, gate_i2c_addr, gate_data, 2, false);
     *gate_mask = ((uint16_t)gate_data[0] << 8) | gate_data[1];
+    
+    uint16_t steps_addr = addr + 18;
+    uint8_t steps_i2c_addr = EEPROM_BASE_ADDR | ((steps_addr >> 8) & 0x07);
+    uint8_t steps_local_addr = steps_addr & 0xFF;
+    
+    i2c_write_blocking(i2c1, steps_i2c_addr, &steps_local_addr, 1, true);
+    i2c_read_blocking(i2c1, steps_i2c_addr, steps, 1, false);
 }
 
 bool eeprom_has_valid_data() {
