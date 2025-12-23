@@ -98,7 +98,7 @@ int main() {
             }
         }
 
-        if (io_poll_save_button()) {
+        if (io_poll_pattern_select_button()) {
             if (edit_mode == EDIT_NONE) {
                 edit_mode = PATTERN_SELECT;
                 temp_pattern_slot = pattern_slot;
@@ -192,7 +192,7 @@ int main() {
         }
 
         if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE) {
-            if (io_poll_load_button()) {
+            if (io_poll_save_button()) {
                 seq_toggle_gate(edit_step);
                 if (edit_mode == EDIT_SELECT_STEP) {
                     ui_show_edit_step(edit_step, seq_get_note(edit_step));
@@ -201,7 +201,7 @@ int main() {
                 }
             }
         } else if (edit_mode == PATTERN_SELECT) {
-            if (io_poll_load_button()) {
+            if (io_poll_save_button()) {
                 seq_save_pattern_ram_only(temp_pattern_slot);
                 if (!seq_is_playing()) {
                     seq_flush_all_patterns_to_eeprom();

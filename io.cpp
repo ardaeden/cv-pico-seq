@@ -10,8 +10,8 @@ constexpr uint BUTTON_PIN = 2;            // GP2 - Play/Pause button
 constexpr uint STOP_BUTTON_PIN = 7;       // GP7 - Stop button
 constexpr uint STEP_BUTTON_PIN = 8;       // GP8 - Step count button
 constexpr uint EDIT_BUTTON_PIN = 10;      // GP10 - Edit mode button
-constexpr uint SAVE_BUTTON_PIN = 11;      // GP11 - Save pattern button
-constexpr uint LOAD_BUTTON_PIN = 12;      // GP12 - Load pattern button
+constexpr uint PATTERN_SELECT_BUTTON_PIN = 11;      // GP11 - Pattern select button
+constexpr uint SAVE_BUTTON_PIN = 12;      // GP12 - Save button
 constexpr uint64_t DEBOUNCE_US = 50'000;  // 50 ms debounce window
 constexpr uint LED_PIN = 3;               // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 20'000;  // 20 ms LED on time
@@ -26,11 +26,11 @@ uint64_t last_button_event_us = 0;
 bool edit_button_prev = true;
 uint64_t last_edit_button_event_us = 0;
 
+bool pattern_select_button_prev = true;
+uint64_t last_pattern_select_button_event_us = 0;
+
 bool save_button_prev = true;
 uint64_t last_save_button_event_us = 0;
-
-bool load_button_prev = true;
-uint64_t last_load_button_event_us = 0;
 
 bool stop_button_prev = true;
 uint64_t last_stop_button_event_us = 0;
@@ -70,15 +70,15 @@ void io_init() {
     gpio_pull_up(EDIT_BUTTON_PIN);
     edit_button_prev = gpio_get(EDIT_BUTTON_PIN);
 
+    gpio_init(PATTERN_SELECT_BUTTON_PIN);
+    gpio_set_dir(PATTERN_SELECT_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(PATTERN_SELECT_BUTTON_PIN);
+    pattern_select_button_prev = gpio_get(PATTERN_SELECT_BUTTON_PIN);
+
     gpio_init(SAVE_BUTTON_PIN);
     gpio_set_dir(SAVE_BUTTON_PIN, GPIO_IN);
     gpio_pull_up(SAVE_BUTTON_PIN);
     save_button_prev = gpio_get(SAVE_BUTTON_PIN);
-
-    gpio_init(LOAD_BUTTON_PIN);
-    gpio_set_dir(LOAD_BUTTON_PIN, GPIO_IN);
-    gpio_pull_up(LOAD_BUTTON_PIN);
-    load_button_prev = gpio_get(LOAD_BUTTON_PIN);
 
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
@@ -110,12 +110,12 @@ bool io_poll_edit_toggle() {
     return false;
 }
 
-bool io_poll_save_button() {
-    bool button_now = gpio_get(SAVE_BUTTON_PIN);
+bool io_poll_pattern_select_button() {
+    bool button_now = gpio_get(PATTERN_SELECT_BUTTON_PIN);
     uint64_t now_us = time_us_64();
-    if (button_now != save_button_prev && (now_us - last_save_button_event_us) >= DEBOUNCE_US) {
-        save_button_prev = button_now;
-        last_save_button_event_us = now_us;
+    if (button_now != pattern_select_button_prev && (now_us - last_pattern_select_button_event_us) >= DEBOUNCE_US) {
+        pattern_select_button_prev = button_now;
+        last_pattern_select_button_event_us = now_us;
         if (!button_now) {
             return true;
         }
@@ -123,12 +123,12 @@ bool io_poll_save_button() {
     return false;
 }
 
-bool io_poll_load_button() {
-    bool button_now = gpio_get(LOAD_BUTTON_PIN);
+bool io_poll_save_button() {
+    bool button_now = gpio_get(SAVE_BUTTON_PIN);
     uint64_t now_us = time_us_64();
-    if (button_now != load_button_prev && (now_us - last_load_button_event_us) >= DEBOUNCE_US) {
-        load_button_prev = button_now;
-        last_load_button_event_us = now_us;
+    if (button_now != save_button_prev && (now_us - last_save_button_event_us) >= DEBOUNCE_US) {
+        save_button_prev = button_now;
+        last_save_button_event_us = now_us;
         if (!button_now) {
             return true;
         }

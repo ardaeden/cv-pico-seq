@@ -11,11 +11,13 @@ bool io_poll_play_toggle();
 // Returns true when edit mode button was pressed (debounced, edge-triggered).
 bool io_poll_edit_toggle();
 
-// Returns true when save button (GP11) was pressed (debounced, edge-triggered).
-bool io_poll_save_button();
+// Returns true when pattern select button (GP11) was pressed (debounced, edge-triggered).
+bool io_poll_pattern_select_button();
 
-// Returns true when load button (GP12) was pressed (debounced, edge-triggered).
-bool io_poll_load_button();
+
+
+// Returns true when save button (GP12) was pressed (debounced, edge-triggered).
+bool io_poll_save_button();
 
 // Returns true when stop button (GP7) was pressed (debounced, edge-triggered).
 bool io_poll_stop_button();
