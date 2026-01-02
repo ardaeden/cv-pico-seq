@@ -29,8 +29,6 @@ void seq_set_note(uint32_t step, uint8_t note);
 bool seq_get_gate_enabled(uint32_t step);
 void seq_toggle_gate(uint32_t step);
 
-// Pattern save/load operations (10 slots: 0-9)
-void seq_save_pattern(uint8_t slot);
 void seq_save_pattern_ram_only(uint8_t slot);
 void seq_flush_all_patterns_to_eeprom();
 bool seq_has_dirty_patterns();
