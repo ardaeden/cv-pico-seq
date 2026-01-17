@@ -3,6 +3,8 @@
 #include "clock.h"
 #include <cstdint>
 
+enum TransportState { TSTATE_STOP, TSTATE_PLAY, TSTATE_PAUSE };
+
 // Initialize the SSD1306 display (I2C0, SDA=GP4, SCL=GP5, addr=0x3C)
 void ui_init();
 
@@ -14,7 +16,8 @@ void ui_clear();
 
 // Immediately update displayed BPM value and pattern slot (non-blocking)
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
-                 bool blink_slot = false);
+                 TransportState tstate = TSTATE_STOP, bool blink_slot = false,
+                 bool bpm_inverted = false);
 
 // Display 16-step grid (current_step in [0..steps-1]).
 // Shows 8 squares on top row and 8 on bottom; fills the current step square.

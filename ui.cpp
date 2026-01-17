@@ -22,6 +22,8 @@ static bool ui_edit_note_prev_gate = false;
 static uint32_t ui_edit_note_prev_step = 255;
 static int8_t ui_pattern_select_prev_slot = -1;
 
+static void fill_rect(int x0, int y0, int w, int h);
+
 static const uint8_t font5x7[][5] = {
     {0x00, 0x00, 0x00, 0x00, 0x00}, {0x3E, 0x51, 0x49, 0x45, 0x3E}, // 0
     {0x00, 0x42, 0x7F, 0x40, 0x00},                                 // 1
@@ -164,6 +166,22 @@ static void ui_draw_text(int x, int page, const char *str) {
   int pos = x;
   while (*str) {
     ui_draw_char(pos, page, *str);
+    pos += 6;
+    str++;
+  }
+}
+
+static void ui_draw_text_inverted(int x, int page, const char *str) {
+  int pos = x;
+  while (*str) {
+    int idx = char_to_font_index(*str);
+    const uint8_t *glyph = font5x7[idx];
+    if (pos >= 0 && pos + 6 <= 128) {
+      uint8_t *dst = &fb[page * 128 + pos];
+      for (int i = 0; i < 5; ++i)
+        dst[i] = ~glyph[i];
+      dst[5] = 0xFF;
+    }
     pos += 6;
     str++;
   }
@@ -325,18 +343,45 @@ void ui_clear() {
 }
 
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
-                 bool blink_slot) {
+                 TransportState tstate, bool blink_slot, bool bpm_inverted) {
   // Clear only the top page for BPM (1 page height, full width)
   for (int i = 0; i < 128; ++i) {
     fb[0 * 128 + i] = 0x00;
   }
 
+  // Draw Transport Icons (Top-Left)
+  int icon_x = 0;
+  int icon_y = 1; // Slight offset from top
+  switch (tstate) {
+  case TSTATE_STOP:
+    fill_rect(icon_x, icon_y, 6, 6);
+    break;
+  case TSTATE_PLAY:
+    // Right pointing triangle
+    for (int i = 0; i < 4; ++i) {
+      for (int j = i; j < 7 - i; ++j) {
+        set_pixel(icon_x + i, icon_y + j);
+      }
+    }
+    break;
+  case TSTATE_PAUSE:
+    fill_rect(icon_x, icon_y, 2, 6);
+    fill_rect(icon_x + 4, icon_y, 2, 6);
+    break;
+  }
+
+  // Draw Tempo/Source (next to icon)
+  int text_padding = 10;
   if (clock_source == CLOCK_INTERNAL) {
-    char numbuf[32];
-    snprintf(numbuf, sizeof(numbuf), "BPM:%u", (unsigned)bpm);
-    ui_draw_text(0, 0, numbuf);
+    char numbuf[16];
+    snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
+    if (bpm_inverted) {
+      ui_draw_text_inverted(text_padding, 0, numbuf);
+    } else {
+      ui_draw_text(text_padding, 0, numbuf);
+    }
   } else {
-    ui_draw_text(0, 0, "SLAVE");
+    ui_draw_text_inverted(text_padding, 0, "SLAVE");
   }
 
   // Draw pattern slot on right side (P:0-9) - skip if blinking
@@ -444,8 +489,8 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
       (8 * sq_w) + (6 * spacing_x) + group_gap; // 104 + 12 + 8 = 124
   const int left = (128 - total_w) / 2;
 
-  // Keep the relaxed gap from BPM area
-  const int start_y = 13;
+  // Move grid 2px further down for balance
+  const int start_y = 15;
 
   // Clear grid area
   clear_region(0, start_y - 2, 128, 51);
