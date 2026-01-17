@@ -326,49 +326,25 @@ void ui_clear() {
 
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
                  bool blink_slot) {
-  // Clear entire top area for BPM (2 pages height, full width)
+  // Clear only the top page for BPM (1 page height, full width)
   for (int i = 0; i < 128; ++i) {
     fb[0 * 128 + i] = 0x00;
-    fb[1 * 128 + i] = 0x00;
   }
 
   if (clock_source == CLOCK_INTERNAL) {
-    char numbuf[16];
-    int numlen = snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
-    if (numlen <= 0)
-      return;
-
-    int x = 0;
-    // Draw label "BPM:" with 2x scale
-    const char *label = "BPM:";
-    for (const char *p = label; *p; ++p) {
-      draw_scaled_char(x, 0, *p, 2);
-      x += 12; // 5*2 + 2 spacing
-    }
-    // Draw BPM number with 2x scale
-    for (int i = 0; i < numlen; ++i) {
-      draw_scaled_char(x, 0, numbuf[i], 2);
-      x += 12;
-    }
+    char numbuf[32];
+    snprintf(numbuf, sizeof(numbuf), "BPM:%u", (unsigned)bpm);
+    ui_draw_text(0, 0, numbuf);
   } else {
-    // Show "SLAVE" when external clock is active
-    const char *slave_label = "SLAVE";
-    int x = 0;
-    for (const char *p = slave_label; *p; ++p) {
-      draw_scaled_char(x, 0, *p, 2);
-      x += 12;
-    }
+    ui_draw_text(0, 0, "SLAVE");
   }
 
   // Draw pattern slot on right side (P:0-9) - skip if blinking
   if (!blink_slot) {
     char slot_buf[8];
     snprintf(slot_buf, sizeof(slot_buf), "P:%d", pattern_slot);
-    int slot_x = 128 - (strlen(slot_buf) * 12); // Right align
-    for (const char *p = slot_buf; *p; ++p) {
-      draw_scaled_char(slot_x, 0, *p, 2);
-      slot_x += 12;
-    }
+    int slot_x = 128 - (strlen(slot_buf) * 6); // Right align
+    ui_draw_text(slot_x, 0, slot_buf);
   }
 
   ssd1306_update();
