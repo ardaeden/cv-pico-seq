@@ -59,8 +59,10 @@ int main() {
                 if (start_step >= seq_get_steps()) start_step = 0;
                 bool first_gate = seq_get_gate_enabled(start_step);
                 clock_gate_enable(first_gate);
+                clock_out_enable(true);
             } else {
                 clock_gate_enable(false);
+                clock_out_enable(false);
                 if (was_playing && seq_has_dirty_patterns()) {
                     seq_flush_all_patterns_to_eeprom();
                 }
@@ -70,6 +72,7 @@ int main() {
         if (io_poll_stop_button()) {
             seq_stop();
             clock_gate_enable(false);
+            clock_out_enable(false);
             
             if (seq_has_dirty_patterns()) {
                 seq_flush_all_patterns_to_eeprom();
