@@ -70,7 +70,7 @@ void core1_main() {
 
 void clock_set_bpm(uint32_t bpm) {
     uint64_t us_per_quarter = 60000000ULL / (bpm ? bpm : 120);
-    clock_interval_us = static_cast<uint32_t>(us_per_quarter / 4);
+    clock_interval_us = static_cast<uint32_t>(us_per_quarter / 24);
 }
 
 void clock_launch_core1() {

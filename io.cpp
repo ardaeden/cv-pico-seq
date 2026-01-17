@@ -44,7 +44,7 @@ uint64_t led_blink_start_us = 0;
 uint8_t encoder_prev_state = 0;
 int8_t encoder_accum = 0;
 std::atomic<int> encoder_pending{0};
-constexpr int ENCODER_DETENT_STEPS = 2;
+constexpr int ENCODER_DETENT_STEPS = 4;
 
 void encoder_gpio_irq(uint gpio, uint32_t events);
 

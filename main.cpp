@@ -6,6 +6,7 @@
 #include "ui.h"
 
 int main() {
+    stdio_init_all();
     io_init();
     io_encoder_init();
     seq_init();
@@ -34,6 +35,7 @@ int main() {
     uint8_t blink_slot = 0;
     
     int encoder_step = 1;
+    uint32_t tick_count = 0;
     while (true) {
         io_update_led();
         
@@ -218,41 +220,53 @@ int main() {
 
         if (clock_consume_tick()) {
             if (!seq_is_playing()) {
+                tick_count = 0;
                 tight_loop_contents();
                 continue;
             }
 
-            seq_advance_step();
+            // Sync: Sequencer advances every 6 ticks (24 PPQN / 6 = 4 pulses per quarter = 16th notes)
+            if (tick_count % 6 == 0) {
+                seq_advance_step();
 
-            uint32_t cur = seq_current_step();
-            uint8_t midi_note = seq_get_note(cur);
-            
-            int32_t semitones = (int32_t)midi_note - MIDI_BASE;
-            int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
-            
-            if (dac_val < 0) dac_val = 0;
-            if (dac_val > 0x0FFF) dac_val = 0x0FFF;
-            
-            clock_set_cv((uint16_t)dac_val);
-            
-            uint32_t next_step = (cur + 1) % seq_get_steps();
-            bool next_gate_enabled = seq_get_gate_enabled(next_step);
-            clock_gate_enable(next_gate_enabled);
-
-            if (edit_mode == EDIT_NONE) {
-                ui_show_steps(seq_current_step(), seq_get_steps());
+                uint32_t cur = seq_current_step();
+                uint8_t midi_note = seq_get_note(cur);
                 
-                int8_t pending = seq_get_pending_pattern();
-                bool blink = false;
-                if (pending >= 0) {
-                    blink = (seq_current_step() % 4 < 2);
+                int32_t semitones = (int32_t)midi_note - MIDI_BASE;
+                int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
+                
+                if (dac_val < 0) dac_val = 0;
+                if (dac_val > 0x0FFF) dac_val = 0x0FFF;
+                
+                clock_set_cv((uint16_t)dac_val);
+                
+                // Set gate to enable for the triggers coming in the next 6 ticks
+                // clock.cpp will trigger physical gate on every pulse if enabled
+                // We only want a gate on the first of the 6 pulses
+                bool gate_enabled = seq_get_gate_enabled(cur);
+                clock_gate_enable(gate_enabled);
+
+                if (edit_mode == EDIT_NONE) {
+                    ui_show_steps(seq_current_step(), seq_get_steps());
+                    
+                    int8_t pending = seq_get_pending_pattern();
+                    bool blink = false;
+                    if (pending >= 0) {
+                        blink = (seq_current_step() % 4 < 2);
+                    }
+                    ui_show_bpm(seq_get_bpm(), pattern_slot, blink);
                 }
-                ui_show_bpm(seq_get_bpm(), pattern_slot, blink);
+
+                if (seq_current_step() % 4 == 0) {
+                    io_blink_led_start();
+                }
+            } else {
+                // For ticks 1-5 of the 16th note, we disable the gate trigger to avoid 24 pulses per bar
+                clock_gate_enable(false);
             }
 
-            if (seq_current_step() % 4 == 0) {
-                io_blink_led_start();
-            }
+            tick_count++;
+            if (tick_count >= 24) tick_count = 0;
         }
 
         tight_loop_contents();
