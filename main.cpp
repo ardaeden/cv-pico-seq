@@ -14,6 +14,7 @@ int main() {
   seq_load_pattern(0);
 
   clock_set_bpm(seq_get_bpm());
+  clock_init();
   clock_launch_core1();
 
   ui_init();
@@ -24,18 +25,7 @@ int main() {
   constexpr uint8_t MIDI_BASE = 36;
   constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
 
-  auto update_cv = [&](uint32_t step) {
-    if (seq_get_gate_enabled(step)) {
-      uint8_t midi_note = seq_get_note(step);
-      int32_t semitones = (int32_t)midi_note - MIDI_BASE;
-      int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
-      if (dac_val < 0)
-        dac_val = 0;
-      if (dac_val > 0x0FFF)
-        dac_val = 0x0FFF;
-      clock_set_cv((uint16_t)dac_val);
-    }
-  };
+  // Output handling moved to Core 1
 
   enum EditMode {
     EDIT_NONE,
@@ -55,7 +45,6 @@ int main() {
   uint8_t blink_slot = 0;
 
   int encoder_step = 1;
-  uint32_t tick_count = 0;
   while (true) {
     io_update_led();
 
@@ -75,19 +64,12 @@ int main() {
       bool is_playing = seq_toggle_play();
 
       if (is_playing) {
-        // Sync start: Restart clock and advance to first step immediately
         clock_restart();
-        seq_advance_step();
-        tick_count = 1;
-
-        uint32_t cur = seq_current_step();
-        bool gate_on = seq_get_gate_enabled(cur);
-
-        update_cv(cur);
-        clock_gate_enable(gate_on);
+        clock_gate_enable(true);
         clock_out_enable(true);
 
         // LED and UI updates for the first step
+        uint32_t cur = seq_current_step();
         if (cur % 4 == 0) {
           io_blink_led_start();
         }
@@ -109,6 +91,7 @@ int main() {
     if (io_poll_stop_button()) {
       seq_stop();
       clock_gate_enable(false);
+      clock_out_enable(false);
       clock_out_enable(false);
 
       if (seq_has_dirty_patterns()) {
@@ -299,49 +282,25 @@ int main() {
       }
     }
 
-    if (clock_consume_tick()) {
-      if (!seq_is_playing()) {
-        tick_count = 0;
-        tight_loop_contents();
-        continue;
+    if (clock_consume_step()) {
+      uint32_t cur = seq_current_step();
+      if (edit_mode == EDIT_NONE) {
+        ui_show_steps(cur, seq_get_steps());
+
+        int8_t pending = seq_get_pending_pattern();
+        bool blink = false;
+        if (pending >= 0) {
+          blink = (cur % 4 < 2);
+        }
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(), blink);
       }
 
-      // Sync: Sequencer advances every 6 ticks (24 PPQN / 6 = 4 pulses per
-      // quarter = 16th notes)
-      if (tick_count % 6 == 0) {
-        seq_advance_step();
-
-        uint32_t cur = seq_current_step();
-        bool gate_on = seq_get_gate_enabled(cur);
-
-        update_cv(cur);
-        clock_gate_enable(gate_on);
-
-        if (edit_mode == EDIT_NONE) {
-          ui_show_steps(seq_current_step(), seq_get_steps());
-
-          int8_t pending = seq_get_pending_pattern();
-          bool blink = false;
-          if (pending >= 0) {
-            blink = (seq_current_step() % 4 < 2);
-          }
-          ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(), blink);
-        }
-
-        if (seq_current_step() % 4 == 0) {
-          io_blink_led_start();
-        }
-      } else {
-        // For ticks 1-5 of the 16th note, we disable the gate trigger to avoid
-        // 24 pulses per bar
-        clock_gate_enable(false);
+      if (cur % 4 == 0) {
+        io_blink_led_start();
       }
-
-      tick_count++;
-      if (tick_count >= 24)
-        tick_count = 0;
     }
 
     tight_loop_contents();
   }
+  return 0;
 }
