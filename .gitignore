@@ -4,3 +4,4 @@ eeprom_reset.cpp
 eeprom_reset_CMakeLists.txt
 *.dis
 *.uf2
+.vscode/
