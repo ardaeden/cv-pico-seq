@@ -1,10 +1,10 @@
 # CV Pico Sequencer
 
-A professional-grade, open-source CV/Gate sequencer designed for the Raspberry Pi Pico (RP2040). This project delivers a robust 16-step sequencer with real-time performance features, precise timing, and a rich OLED interface, making it an ideal core for modular synthesizer setups.
+A professional-grade, open-source CV/Gate sequencer designed for the Raspberry Pi Pico (RP2040). This project delivers a robust 32-step sequencer with real-time performance features, precise timing, and a rich OLED interface, making it an ideal core for modular synthesizer setups.
 
 ## 🚀 Overview
 
-The **CV Pico Sequencer** transforms a standard Raspberry Pi Pico into a capable Eurorack-style sequencer. It features adjustable BPM, variable pattern lengths (1-16 steps), per-step note editing, and a dedicated pattern management system. Built with C++17 and the Pico SDK, it leverages the RP2040's dual-core architecture for rock-solid timing stability.
+The **CV Pico Sequencer** transforms a standard Raspberry Pi Pico into a capable Eurorack-style sequencer. It features adjustable BPM, variable pattern lengths (1-32 steps), per-step note editing, and a dedicated pattern management system. Built with C++17 and the Pico SDK, it leverages the RP2040's dual-core architecture for rock-solid timing stability.
 
 ## ✨ Features
 
@@ -23,7 +23,11 @@ The **CV Pico Sequencer** transforms a standard Raspberry Pi Pico into a capable
 - **Auto-Flush:** Changes are automatically flushed to non-volatile storage when sequence is stopped or paused.
 
 ### User Interface
-- **OLED Display:** Optimized for 128x64 SSD1306 displays, providing clear feedback on BPM, active steps, notes, and editing modes.
+- **Refined OLED Display:** Optimized for 128x64 SSD1306 displays with a high-density 32-step grid.
+  - **Rectangular Layout:** Professional 13x8 pixel step boxes.
+  - **Visual Grouping:** Steps are grouped in 4-step blocks (`XXXX XXXX`) for better readability.
+  - **Ghosting Effect:** Steps outside the active sequence length are dimmed using a dithered pattern.
+  - **Inverted Labels:** The "SLAVE" label is inverted when using an external clock for instant visual feedback.
 - **Intuitive Navigation:** Rotary encoder and dedicated function buttons allow for fast, hands-on control.
 - **Fine/Coarse Control:** Toggle between 1x and 10x BPM adjustment by pressing the encoder button in the main view.
 - **Visual Feedback:** Real-time playback visualization, LED beat indicators, and big-digit visual confirmation for save operations.
@@ -145,11 +149,10 @@ The codebase is modular, written in **C++17**, and structured for maintainabilit
 
 ## 📖 User Manual
 
-### Main Screen
-Displays the current **BPM** (Tempo) and the **Step Grid**. The active step is highlighted during playback.
+Displays the current **BPM** (Tempo), **Pattern Slot**, and the **32-Step Grid**.
 - **Rotate Encoder:** Adjust BPM.
 - **Press Encoder Button:** Toggle BPM adjustment speed between **1x** and **10x**.
-- **Hold "Step Count" (GP8) + Rotate Encoder:** Change pattern length (1-16 steps).
+- **Hold "Step Count" (GP8) + Rotate Encoder:** Change pattern length (1-32 steps).
 
 ### Playback Control
 - **Play/Pause (GP2):** Starts or pauses the sequence.
@@ -158,8 +161,8 @@ Displays the current **BPM** (Tempo) and the **Step Grid**. The active step is h
 ### Editing Patterns
 1.  **Step Enable/Disable (Gate):**
     - Press **Edit Mode (GP10)** once to enter "Edit Step" mode.
-    - Rotate Encoder to select a step.
-    - Press **Step Count (GP8)** to toggle the Gate for that step.
+    - Rotate Encoder to select a step (0-31). The UI automatically pages between Steps 1-16 and 17-32.
+- Press **Step Count (GP8)** to toggle the Gate for that step.
     
 2.  **Note Editing (Pitch):**
     - While in "Edit Step" mode, **Press Encoder Button** to enter "Edit Note" mode.
@@ -184,5 +187,5 @@ Displays the current **BPM** (Tempo) and the **Step Grid**. The active step is h
 
 ## 🏆 Credits
 
-- **Lead Designer:** User
+- **Lead Designer:** Arda Eden
 - **Coder:** Antigravity
