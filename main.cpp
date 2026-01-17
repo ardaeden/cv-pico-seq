@@ -55,11 +55,35 @@ int main() {
             bool is_playing = seq_toggle_play();
             
             if (is_playing) {
-                uint32_t start_step = seq_current_step() + 1;
-                if (start_step >= seq_get_steps()) start_step = 0;
-                bool first_gate = seq_get_gate_enabled(start_step);
-                clock_gate_enable(first_gate);
+                // Sync start: Restart clock and advance to first step immediately
+                clock_restart();
+                seq_advance_step();
+                tick_count = 1;
+                
+                uint32_t cur = seq_current_step();
+                bool gate_on = seq_get_gate_enabled(cur);
+
+                if (gate_on) {
+                    uint8_t midi_note = seq_get_note(cur);
+                    int32_t semitones = (int32_t)midi_note - MIDI_BASE;
+                    int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
+                    if (dac_val < 0) dac_val = 0;
+                    if (dac_val > 0x0FFF) dac_val = 0x0FFF;
+                    clock_set_cv((uint16_t)dac_val);
+                }
+                
+                clock_gate_enable(gate_on);
                 clock_out_enable(true);
+
+                // LED and UI updates for the first step
+                if (cur % 4 == 0) {
+                    io_blink_led_start();
+                }
+                if (edit_mode == EDIT_NONE) {
+                    ui_show_steps(cur, seq_get_steps());
+                    int8_t pending = seq_get_pending_pattern();
+                    ui_show_bpm(seq_get_bpm(), pattern_slot, pending >= 0);
+                }
             } else {
                 clock_gate_enable(false);
                 clock_out_enable(false);
@@ -233,21 +257,21 @@ int main() {
                 seq_advance_step();
 
                 uint32_t cur = seq_current_step();
-                uint8_t midi_note = seq_get_note(cur);
-                
-                int32_t semitones = (int32_t)midi_note - MIDI_BASE;
-                int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
-                
-                if (dac_val < 0) dac_val = 0;
-                if (dac_val > 0x0FFF) dac_val = 0x0FFF;
-                
-                clock_set_cv((uint16_t)dac_val);
+                bool gate_on = seq_get_gate_enabled(cur);
+
+                if (gate_on) {
+                    uint8_t midi_note = seq_get_note(cur);
+                    int32_t semitones = (int32_t)midi_note - MIDI_BASE;
+                    int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
+                    
+                    if (dac_val < 0) dac_val = 0;
+                    if (dac_val > 0x0FFF) dac_val = 0x0FFF;
+                    
+                    clock_set_cv((uint16_t)dac_val);
+                }
                 
                 // Set gate to enable for the triggers coming in the next 6 ticks
-                // clock.cpp will trigger physical gate on every pulse if enabled
-                // We only want a gate on the first of the 6 pulses
-                bool gate_enabled = seq_get_gate_enabled(cur);
-                clock_gate_enable(gate_enabled);
+                clock_gate_enable(gate_on);
 
                 if (edit_mode == EDIT_NONE) {
                     ui_show_steps(seq_current_step(), seq_get_steps());

@@ -122,3 +122,14 @@ void clock_set_cv(uint16_t dac_val) {
     
     restore_interrupts(save);
 }
+
+void clock_restart() {
+    uint32_t save = save_and_disable_interrupts();
+    us_counter = 0;
+    // Clearing tick_flag ensures we don't process a stale tick immediately
+    tick_flag = false;
+    // Ensure outputs are clean
+    gpio_put(GATE_PIN, false);
+    gate_active = false;
+    restore_interrupts(save);
+}

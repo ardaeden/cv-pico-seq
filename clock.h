@@ -19,3 +19,6 @@ void clock_out_enable(bool enable);
 
 // Set CV/DAC value (updated on next tick by core 1)
 void clock_set_cv(uint16_t dac_value);
+
+// Reset the internal us_counter to align with a start event
+void clock_restart();
