@@ -324,30 +324,40 @@ void ui_clear() {
   ui_pattern_select_prev_slot = -1;
 }
 
-void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, bool blink_slot) {
-  char numbuf[16];
-  int numlen = snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
-  if (numlen <= 0)
-    return;
-
-  // Larger BPM display at top-left using 2x scale
+void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
+                 bool blink_slot) {
   // Clear entire top area for BPM (2 pages height, full width)
   for (int i = 0; i < 128; ++i) {
     fb[0 * 128 + i] = 0x00;
     fb[1 * 128 + i] = 0x00;
   }
 
-  int x = 0;
-  // Draw label "BPM:" with 2x scale
-  const char *label = "BPM:";
-  for (const char *p = label; *p; ++p) {
-    draw_scaled_char(x, 0, *p, 2);
-    x += 12; // 5*2 + 2 spacing
-  }
-  // Draw BPM number with 2x scale
-  for (int i = 0; i < numlen; ++i) {
-    draw_scaled_char(x, 0, numbuf[i], 2);
-    x += 12;
+  if (clock_source == CLOCK_INTERNAL) {
+    char numbuf[16];
+    int numlen = snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
+    if (numlen <= 0)
+      return;
+
+    int x = 0;
+    // Draw label "BPM:" with 2x scale
+    const char *label = "BPM:";
+    for (const char *p = label; *p; ++p) {
+      draw_scaled_char(x, 0, *p, 2);
+      x += 12; // 5*2 + 2 spacing
+    }
+    // Draw BPM number with 2x scale
+    for (int i = 0; i < numlen; ++i) {
+      draw_scaled_char(x, 0, numbuf[i], 2);
+      x += 12;
+    }
+  } else {
+    // Show "SLAVE" when external clock is active
+    const char *slave_label = "SLAVE";
+    int x = 0;
+    for (const char *p = slave_label; *p; ++p) {
+      draw_scaled_char(x, 0, *p, 2);
+      x += 12;
+    }
   }
 
   // Draw pattern slot on right side (P:0-9) - skip if blinking

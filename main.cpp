@@ -18,7 +18,7 @@ int main() {
 
   ui_init();
   ui_boot_animation();
-  ui_show_bpm(seq_get_bpm(), 0);
+  ui_show_bpm(seq_get_bpm(), 0, clock_get_source());
   ui_show_steps(seq_get_steps(), seq_get_steps());
 
   constexpr uint8_t MIDI_BASE = 36;
@@ -94,7 +94,8 @@ int main() {
         if (edit_mode == EDIT_NONE) {
           ui_show_steps(cur, seq_get_steps());
           int8_t pending = seq_get_pending_pattern();
-          ui_show_bpm(seq_get_bpm(), pattern_slot, pending >= 0);
+          ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
+                      pending >= 0);
         }
       } else {
         clock_gate_enable(false);
@@ -115,14 +116,14 @@ int main() {
       }
 
       if (edit_mode == EDIT_NONE) {
-        ui_show_bpm(seq_get_bpm(), pattern_slot);
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source());
         ui_show_steps(seq_get_steps(), seq_get_steps());
       } else if (edit_mode == PATTERN_SELECT) {
         ui_show_pattern_select(temp_pattern_slot);
       } else if (edit_mode == SETTINGS) {
         edit_mode = EDIT_NONE;
         ui_clear();
-        ui_show_bpm(seq_get_bpm(), pattern_slot);
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source());
         ui_show_steps(seq_current_step(), seq_get_steps());
       }
     }
@@ -136,7 +137,7 @@ int main() {
                  edit_mode == SETTINGS) {
         edit_mode = EDIT_NONE;
         ui_clear();
-        ui_show_bpm(seq_get_bpm(), pattern_slot);
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source());
         ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
                       seq_get_steps());
       } else if (edit_mode == PATTERN_SELECT) {
@@ -155,7 +156,7 @@ int main() {
       } else if (edit_mode == PATTERN_SELECT) {
         edit_mode = EDIT_NONE;
         ui_clear();
-        ui_show_bpm(seq_get_bpm(), pattern_slot);
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source());
         ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
                       seq_get_steps());
       }
@@ -179,7 +180,7 @@ int main() {
         pattern_slot = temp_pattern_slot;
         edit_mode = EDIT_NONE;
         ui_clear();
-        ui_show_bpm(seq_get_bpm(), pattern_slot);
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source());
         ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
                       seq_get_steps());
       } else if (edit_mode == SETTINGS) {
@@ -238,16 +239,18 @@ int main() {
           ui_show_steps(seq_is_playing() ? seq_current_step() : 16,
                         (uint32_t)new_steps);
         } else {
-          uint32_t current_bpm = seq_get_bpm();
-          int new_bpm = (int)current_bpm + encoder_delta * encoder_step;
-          if (new_bpm < 20)
-            new_bpm = 20;
-          if (new_bpm > 300)
-            new_bpm = 300;
+          if (clock_get_source() == CLOCK_INTERNAL) {
+            uint32_t current_bpm = seq_get_bpm();
+            int new_bpm = (int)current_bpm + encoder_delta * encoder_step;
+            if (new_bpm < 20)
+              new_bpm = 20;
+            if (new_bpm > 300)
+              new_bpm = 300;
 
-          seq_set_bpm((uint32_t)new_bpm);
-          clock_set_bpm((uint32_t)new_bpm);
-          ui_show_bpm((uint32_t)new_bpm, pattern_slot);
+            seq_set_bpm((uint32_t)new_bpm);
+            clock_set_bpm((uint32_t)new_bpm);
+            ui_show_bpm((uint32_t)new_bpm, pattern_slot, clock_get_source());
+          }
         }
       }
     }
@@ -284,7 +287,7 @@ int main() {
       if (io_poll_save_button()) {
         edit_mode = EDIT_NONE;
         ui_clear();
-        ui_show_bpm(seq_get_bpm(), pattern_slot);
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source());
         ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
                       seq_get_steps());
       }
@@ -322,7 +325,7 @@ int main() {
           if (pending >= 0) {
             blink = (seq_current_step() % 4 < 2);
           }
-          ui_show_bpm(seq_get_bpm(), pattern_slot, blink);
+          ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(), blink);
         }
 
         if (seq_current_step() % 4 == 0) {

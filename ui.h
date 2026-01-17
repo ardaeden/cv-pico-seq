@@ -13,7 +13,8 @@ void ui_boot_animation();
 void ui_clear();
 
 // Immediately update displayed BPM value and pattern slot (non-blocking)
-void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, bool blink_slot = false);
+void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
+                 bool blink_slot = false);
 
 // Display 16-step grid (current_step in [0..steps-1]).
 // Shows 8 squares on top row and 8 on bottom; fills the current step square.
