@@ -3,6 +3,7 @@
 #include "hardware/i2c.h"
 #include "pico/stdlib.h"
 #include "sequencer.h"
+#include <cstdlib>
 
 #include <cstdio>
 #include <cstring>
@@ -61,8 +62,11 @@ static const uint8_t font5x7[][5] = {
     {0x61, 0x51, 0x49, 0x45, 0x43},                                 // Z
     {0x14, 0x7F, 0x14, 0x7F, 0x14},                                 // #
     {0x60, 0x30, 0x18, 0x0C, 0x06},                                 // /
-    {0x41, 0x22, 0x14, 0x08, 0x00},                                 // >
-    {0x08, 0x14, 0x22, 0x41, 0x00}                                  // <
+    {0x41, 0x22, 0x14, 0x08, 0x00},                                 // 40: >
+    {0x08, 0x14, 0x22, 0x41, 0x00},                                 // 41: <
+    {0x20, 0x54, 0x54, 0x54, 0x38},                                 // 42: a
+    {0x7C, 0x04, 0x04, 0x04, 0x78},                                 // 43: n
+    {0x38, 0x44, 0x44, 0x44, 0x38}                                  // 44: o
 };
 
 static int char_to_font_index(char c) {
@@ -74,7 +78,10 @@ static int char_to_font_index(char c) {
     return 11;
   if (c >= 'A' && c <= 'Z')
     return 12 + (c - 'A');
-  if (c >= 'a' && c <= 'z')
+  if (c == 'a') return 42;
+  if (c == 'n') return 43;
+  if (c == 'o') return 44;
+  if (c >= 'b' && c <= 'z') // Fallback for other lowercase
     return 12 + (c - 'a');
   if (c == '#')
     return 38;
@@ -139,18 +146,7 @@ void ssd1306_update() {
   }
 }
 
-static void ssd1306_update_region(uint8_t start_page, uint8_t end_page) {
-  for (uint8_t page = start_page; page <= end_page && page < 8; ++page) {
-    ssd1306_write_command(0xB0 | page);
-    ssd1306_write_command(0x00);
-    ssd1306_write_command(0x10);
 
-    uint8_t buf[129];
-    buf[0] = 0x40;
-    memcpy(&buf[1], &fb[page * 128], 128);
-    i2c_write_blocking(i2c0, SSD1306_ADDR, buf, 129, false);
-  }
-}
 
 static void ui_draw_char(int x, int page, char c) {
   int idx = char_to_font_index(c);
@@ -229,86 +225,86 @@ void ui_init() {
 }
 
 void ui_boot_animation() {
-  // Sequencer-style wave animation: 16 steps fill in, then pulse
-  const int sq = 12;
-  const int spacing = 4;
+  // Brand: aAOn
+  // Subtitle: CV Sequencer
 
-  // Phase 1: Steps fill in sequentially (like sequencer ticks)
-  for (int step = 0; step < 16; step++) {
+  // 1. Line expansion from center
+  for (int w = 0; w < 128; w += 8) {
     ssd1306_clear_fb();
-
-    // Draw all steps up to current
-    for (int i = 0; i <= step; i++) {
-      int row = (i < 8) ? 0 : 1;
-      int col = i % 8;
-
-      int bottom_y = 64 - sq;
-      int top_y = bottom_y - sq - 8;
-      int step_y = (row == 0) ? top_y : bottom_y;
-      int x = col * (sq + spacing);
-
-      // Fill square
-      for (int dy = 0; dy < sq; dy++) {
-        int y = step_y + dy;
-        int page = y / 8;
-        int bit = y % 8;
-        for (int dx = 0; dx < sq; dx++) {
-          if (page < 8 && x + dx < 128) {
-            fb[page * 128 + x + dx] |= (1 << bit);
-          }
-        }
-      }
-    }
-
-    ssd1306_update();
-    sleep_ms(70);
-  }
-
-  // Phase 2: Pulsing effect - all squares pulse 3 times
-  for (int pulse = 0; pulse < 3; pulse++) {
-    // Fill all
-    ssd1306_clear_fb();
-    for (int step = 0; step < 16; step++) {
-      int row = (step < 8) ? 0 : 1;
-      int col = step % 8;
-
-      int bottom_y = 64 - sq;
-      int top_y = bottom_y - sq - 8;
-      int step_y = (row == 0) ? top_y : bottom_y;
-      int x = col * (sq + spacing);
-
-      for (int dy = 0; dy < sq; dy++) {
-        int y = step_y + dy;
-        int page = y / 8;
-        int bit = y % 8;
-        for (int dx = 0; dx < sq; dx++) {
-          if (page < 8 && x + dx < 128) {
-            fb[page * 128 + x + dx] |= (1 << bit);
-          }
-        }
-      }
+    int x0 = 64 - w / 2;
+    for (int x = x0; x < x0 + w; x++) {
+      set_pixel(x, 32);
     }
     ssd1306_update();
-    sleep_ms(150);
-
-    // Clear all
-    ssd1306_clear_fb();
-    ssd1306_update();
-    sleep_ms(150);
+    sleep_ms(10);
   }
 
-  // Phase 3: "CV-PICO-SEQ" text fade in
+  // 2. Line splits and moves to top/bottom
+  for (int y = 0; y < 32; y += 4) {
+    ssd1306_clear_fb();
+    for (int x = 0; x < 128; x++) {
+      set_pixel(x, 32 - y);
+      set_pixel(x, 32 + y);
+    }
+    ssd1306_update();
+    sleep_ms(15);
+  }
+
+  // 3. "aAOn" Fades in with scale pulse
+  const char *brand = "aAOn";
+  for (int scale = 1; scale <= 4; scale++) {
+    ssd1306_clear_fb();
+    // Re-draw border lines
+    for (int x = 0; x < 128; x++) {
+        set_pixel(x, 0);
+        set_pixel(x, 63);
+    }
+    
+    int brand_w = (5 * scale + 2) * 4;
+    int brand_x = (128 - brand_w) / 2;
+    int brand_y = (64 - (7 * scale)) / 2;
+    
+    for (int i = 0; i < 4; i++) {
+        draw_scaled_char(brand_x + i * (5 * scale + 2), brand_y, brand[i], scale);
+    }
+    ssd1306_update();
+    sleep_ms(50);
+  }
+
+  // 4. Glitch Effect
+  for (int g = 0; g < 5; g++) {
+      for (int i = 0; i < 20; i++) {
+          set_pixel(rand() % 128, rand() % 64);
+      }
+      ssd1306_update();
+      sleep_ms(30);
+  }
+
+  // 5. Add "CV Sequencer" subtitle
   ssd1306_clear_fb();
-  const char *text = "CV-PICO-SEQ";
-  int text_len = 11;
-  int char_width = 6;
-  int start_x = (128 - (text_len * char_width)) / 2;
-
-  for (int i = 0; i < text_len; i++) {
-    ui_draw_char(start_x + i * char_width, 3, text[i]);
+  // Border lines
+  for (int x = 0; x < 128; x++) {
+      set_pixel(x, 0);
+      set_pixel(x, 63);
   }
+  
+  // aAOn at scale 4
+  int scale = 4;
+  int brand_w = (5 * scale + 2) * 4;
+  int brand_x = (128 - brand_w) / 2;
+  int brand_y = 10;
+  for (int i = 0; i < 4; i++) {
+      draw_scaled_char(brand_x + i * (5 * scale + 2), brand_y, brand[i], scale);
+  }
+  
+  // CV Sequencer at scale 1
+  const char *sub = "CV SEQUENCER";
+  int sub_w = strlen(sub) * 6;
+  int sub_x = (128 - sub_w) / 2;
+  ui_draw_text(sub_x, 6, sub);
+  
   ssd1306_update();
-  sleep_ms(400);
+  sleep_ms(1500);
 
   ssd1306_clear_fb();
   ssd1306_update();

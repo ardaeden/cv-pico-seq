@@ -36,7 +36,7 @@ static SequencerState state = {
 void seq_init() {
   state.bpm = 120;
   state.steps = 16;
-  state.current_step = 15;
+  state.current_step = (state.steps > 0) ? (state.steps - 1) : 15;
   state.playing.store(false);
 }
 

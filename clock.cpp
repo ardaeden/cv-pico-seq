@@ -15,9 +15,9 @@ constexpr uint GATE_PIN = 6;
 constexpr uint CLOCK_OUT_PIN = 22;
 volatile bool gate_active = false;
 volatile uint64_t gate_start_us = 0;
-volatile uint64_t gate_duration_us = 0;
 volatile bool gate_enabled = false;
 volatile bool clock_out_enabled = false;
+volatile uint64_t gate_duration_us = 2500;
 
 constexpr uint DAC_CS_PIN = 17;
 
@@ -34,7 +34,6 @@ bool timer_callback(struct repeating_timer *t) {
             gpio_put(GATE_PIN, true);
             gate_active = true;
             gate_start_us = time_us_64();
-            gate_duration_us = clock_interval_us / 2;
         }
     }
 
@@ -88,6 +87,7 @@ void core1_main() {
 void clock_set_bpm(uint32_t bpm) {
     uint64_t us_per_quarter = 60000000ULL / (bpm ? bpm : 120);
     clock_interval_us = static_cast<uint32_t>(us_per_quarter / 24);
+    gate_duration_us = clock_interval_us / 2;
 }
 
 void clock_launch_core1() {

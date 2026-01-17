@@ -19,10 +19,21 @@ int main() {
     ui_init();
     ui_boot_animation();
     ui_show_bpm(seq_get_bpm(), 0);
-    ui_show_steps(16, seq_get_steps());
+    ui_show_steps(seq_get_steps(), seq_get_steps());
 
     constexpr uint8_t MIDI_BASE = 36;
     constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
+
+    auto update_cv = [&](uint32_t step) {
+        if (seq_get_gate_enabled(step)) {
+            uint8_t midi_note = seq_get_note(step);
+            int32_t semitones = (int32_t)midi_note - MIDI_BASE;
+            int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
+            if (dac_val < 0) dac_val = 0;
+            if (dac_val > 0x0FFF) dac_val = 0x0FFF;
+            clock_set_cv((uint16_t)dac_val);
+        }
+    };
 
     enum EditMode { EDIT_NONE, EDIT_SELECT_STEP, EDIT_NOTE, PATTERN_SELECT };
     EditMode edit_mode = EDIT_NONE;
@@ -63,15 +74,7 @@ int main() {
                 uint32_t cur = seq_current_step();
                 bool gate_on = seq_get_gate_enabled(cur);
 
-                if (gate_on) {
-                    uint8_t midi_note = seq_get_note(cur);
-                    int32_t semitones = (int32_t)midi_note - MIDI_BASE;
-                    int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
-                    if (dac_val < 0) dac_val = 0;
-                    if (dac_val > 0x0FFF) dac_val = 0x0FFF;
-                    clock_set_cv((uint16_t)dac_val);
-                }
-                
+                update_cv(cur);
                 clock_gate_enable(gate_on);
                 clock_out_enable(true);
 
@@ -259,18 +262,7 @@ int main() {
                 uint32_t cur = seq_current_step();
                 bool gate_on = seq_get_gate_enabled(cur);
 
-                if (gate_on) {
-                    uint8_t midi_note = seq_get_note(cur);
-                    int32_t semitones = (int32_t)midi_note - MIDI_BASE;
-                    int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
-                    
-                    if (dac_val < 0) dac_val = 0;
-                    if (dac_val > 0x0FFF) dac_val = 0x0FFF;
-                    
-                    clock_set_cv((uint16_t)dac_val);
-                }
-                
-                // Set gate to enable for the triggers coming in the next 6 ticks
+                update_cv(cur);
                 clock_gate_enable(gate_on);
 
                 if (edit_mode == EDIT_NONE) {
