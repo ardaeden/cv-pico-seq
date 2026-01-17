@@ -13,17 +13,20 @@ The **CV Pico Sequencer** transforms a standard Raspberry Pi Pico into a capable
 - **Precision Timing:** BPM range from 20 to 300, driven by a dedicated hardware timer on Core 1 for jitter-free clocking.
 - **CV/Gate Output:**
   - **CV:** 1V/Octave standard (0-4095 DAC resolution), covering a wide musical range (MIDI notes 36-84).
-  - **Gate:** 3.3V digital output for triggering envelopes (requires buffering for Eurorack levels).
+  - **Gate:** 3.3V digital output (GP6) with configurable duration (50% duty cycle).
+- **Clock Output:** Dedicated 24 PPQN clock output (GP22) for syncing external gear.
 
 ### Pattern Management
 - **10 Pattern Slots:** Store and recall up to 10 unique patterns (Slots 0-9).
 - **Non-Volatile Storage:** Patterns are saved to the onboard flash memory/EEPROM, persisting across power cycles.
-- **Performance Queuing:** Switch patterns seamlessly during playback. The next pattern queues and launches perfectly in sync at the end of the current cycle.
+- **Performance Queuing:** Switch patterns seamlessly during playback. The next pattern queues and launches perfectly in sync at the end of the current cycle (BPM display blinks when a pattern is queued).
+- **Auto-Flush:** Changes are automatically flushed to non-volatile storage when sequence is stopped or paused.
 
 ### User Interface
 - **OLED Display:** Optimized for 128x64 SSD1306 displays, providing clear feedback on BPM, active steps, notes, and editing modes.
-- **Intuitive Navigation:** Rotary encoder and dedicated function buttons allow for fast, hands-on control without menu diving.
-- **Visual Feedback:** Real-time playback visualization, LED beat indicators, and blinking confirmation for save operations.
+- **Intuitive Navigation:** Rotary encoder and dedicated function buttons allow for fast, hands-on control.
+- **Fine/Coarse Control:** Toggle between 1x and 10x BPM adjustment by pressing the encoder button in the main view.
+- **Visual Feedback:** Real-time playback visualization, LED beat indicators, and big-digit visual confirmation for save operations.
 
 ---
 
@@ -41,18 +44,36 @@ The system is built around the **Raspberry Pi Pico**.
 
 | Component         | GPIO Pin | Type   | Description |
 |-------------------|----------|--------|-------------|
+| **Gate Out**      | GP6      | Output | 3.3V Trigger/Gate Output |
+| **Clock Out**     | GP22     | Output | 24 PPQN Sync Clock |
+| **Status LED**    | GP3      | Output | Visual Beat Indicator |
 | **Play/Pause**    | GP2      | Input  | Toggles playback / Gate enable |
 | **Stop**          | GP7      | Input  | Stops playback, resets to Step 1 |
-| **Step Count**    | GP8      | Input  | Hold + Encoder to set pattern length |
-| **Edit Mode**     | GP10     | Input  | Cycles: View -> Edit Steps -> Edit Notes |
+| **Step Count**    | GP8      | Input  | Hold + Encoder to set pattern length / Press in Edit Mode to toggle Gate |
+| **Edit Mode**     | GP10     | Input  | Enter/Exit Step Edit modes |
 | **Pattern Select**| GP11     | Input  | Enter Pattern Select / Queue Mode |
-| **Save**          | GP12     | Input  | Save current pattern to slot |
-| **Encoder SW**    | GP13     | Input  | Confirm / Toggle Sub-modes |
+| **Save**          | GP12     | Input  | Save current pattern to slot (in Pattern Select mode) |
+| **Encoder SW**    | GP13     | Input  | Confirm / Toggle Note Edit / BPM Step (1x/10x) |
 | **Encoder CLK**   | GP14     | Input  | Rotary Encoder Clock |
 | **Encoder DT**    | GP15     | Input  | Rotary Encoder Data |
-| **Status LED**    | GP3      | Output | Visual Beat Indicator |
+| **DAC CS**        | GP17     | Output | SPI Chip Select for MCP4822 |
+| **DAC SCK**       | GP18     | Output | SPI Clock |
+| **DAC TX (MOSI)** | GP19     | Output | SPI Data |
 
 > **Note:** For Eurorack integration, ensure proper voltage scaling/buffering. The Pico outputs 0-3.3V, while Eurorack typically expects 0-5V or 0-10V for CV and Gates.
+
+### 🎮 Button Reference
+
+| Button | Primary Function (Main Screen) | In Edit Mode | In Pattern Select Mode |
+|:---|:---|:---|:---|
+| **Play/Pause (GP2)** | Start / Pause sequence | - | - |
+| **Stop (GP7)** | Stop & Reset to Step 1 | Exit to Main Screen | Exit to Main Screen |
+| **Step Count (GP8)** | **Hold** + Encoder: Set Pattern Length | **Press**: Toggle Step Gate | - |
+| **Edit Mode (GP10)** | Enter Step Edit Mode | Exit to Main Screen | Enter Step Edit Mode |
+| **Pattern Select (GP11)**| Enter Pattern Select Mode | Enter Pattern Select Mode | Exit to Main Screen |
+| **Save (GP12)** | - | - | **Press**: Save to Slot |
+| **Encoder (Rotate)** | Adjust BPM | Select Step / Adjust Pitch | Select Pattern Slot (0-9) |
+| **Encoder (Press)** | Toggle BPM Step (1x / 10x) | Toggle Step vs. Note Edit | Load / Queue Pattern |
 
 ---
 
@@ -63,13 +84,13 @@ The codebase is modular, written in **C++17**, and structured for maintainabilit
 ### Directory Structure
 - **`main.cpp`**: Application entry point, main run loop, and event orchestration.
 - **`sequencer.cpp / .h`**: Core logic for step handling, pattern data, and playback state.
-- **`clock.cpp / .h`**: High-precision timing engine. managing BPM, ticks, and DAC/Gate hardware updates.
-- **`ui.cpp / .h`**: Drawing routines for the SSD1306 OLED, managing menus and visual state.
-- **`io.cpp / .h`**: Hardware abstraction layer for GPIO, Button debouncing, and Encoder interrupts.
+- **`clock.cpp / .h`**: High-precision timing engine managing BPM, ticks, and hardware outputs (Gate/Clock/CV) on Core 1.
+- **`ui.cpp / .h`**: Drawing routines for the SSD1306 OLED using a lightweight driver.
+- **`io.cpp / .h`**: Hardware abstraction layer for GPIO, debouncing, and Encoder interrupts.
 - **`eeprom.cpp / .h`**: Storage abstraction for saving/loading patterns to flash memory.
 
 ### Key Libraries
-- **Pico SDK:** `pico_stdlib`, `pico_multicore`, `hardware_timer`, `hardware_i2c`, `hardware_spi`.
+- **Pico SDK:** `pico_stdlib`, `pico_multicore`, `hardware_timer`, `hardware_i2c`, `hardware_spi`, `hardware_flash`.
 
 ---
 
@@ -119,35 +140,37 @@ The codebase is modular, written in **C++17**, and structured for maintainabilit
 ### Main Screen
 Displays the current **BPM** (Tempo) and the **Step Grid**. The active step is highlighted during playback.
 - **Rotate Encoder:** Adjust BPM.
+- **Press Encoder Button:** Toggle BPM adjustment speed between **1x** and **10x**.
 - **Hold "Step Count" (GP8) + Rotate Encoder:** Change pattern length (1-16 steps).
 
 ### Playback Control
 - **Play/Pause (GP2):** Starts or pauses the sequence.
-- **Stop (GP7):** Stops the sequence and resets the playhead to the first step.
+- **Stop (GP7):** Stops the sequence and resets the playhead to the first step. Patterns are flushed to flash memory upon stopping.
 
 ### Editing Patterns
 1.  **Step Enable/Disable (Gate):**
     - Press **Edit Mode (GP10)** once to enter "Edit Step" mode.
     - Rotate Encoder to select a step.
-    - Press **Save (GP12)** to toggle the Gate for that step.
+    - Press **Step Count (GP8)** to toggle the Gate for that step.
     
 2.  **Note Editing (Pitch):**
-    - Press **Edit Mode** again to enter "Edit Note" mode.
+    - While in "Edit Step" mode, **Press Encoder Button** to enter "Edit Note" mode.
     - Rotate Encoder to change the pitch (Note) for the selected step.
-    - Press **Save (GP12)** to toggle Gate (optional convenience).
+    - Press **Step Count (GP8)** to toggle Gate (optional convenience).
+    - Press **Edit Mode (GP10)** to return to Main Screen.
 
 ### Pattern Management
 1.  **Select/Load Pattern:**
     - Press **Pattern Select (GP11)**.
     - Rotate Encoder to choose a slot (0-9).
     - **Press Encoder Button** to Load.
-      - *If playing:* The pattern is **Queued** and will load automatically when the current pattern finishes.
+      - *If playing:* The pattern is **Queued** (BPM display blinks) and will load automatically at the end of the current pattern cycle.
       - *If stopped:* Loads immediately.
 
 2.  **Save Pattern:**
     - In "Pattern Select" mode, choose your target slot.
     - Press **Save (GP12)**.
-    - The screen will blink to confirm the save.
+    - The screen will show a large digit of the slot number to confirm the save.
 
 ---
 

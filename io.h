@@ -11,10 +11,9 @@ bool io_poll_play_toggle();
 // Returns true when edit mode button was pressed (debounced, edge-triggered).
 bool io_poll_edit_toggle();
 
-// Returns true when pattern select button (GP11) was pressed (debounced, edge-triggered).
+// Returns true when pattern select button (GP11) was pressed (debounced,
+// edge-triggered).
 bool io_poll_pattern_select_button();
-
-
 
 // Returns true when save button (GP12) was pressed (debounced, edge-triggered).
 bool io_poll_save_button();
@@ -24,6 +23,9 @@ bool io_poll_stop_button();
 
 // Returns true when step button (GP8) is currently pressed (held down).
 bool io_is_step_button_pressed();
+
+// Returns true when step button (GP8) was pressed (debounced, edge-triggered).
+bool io_poll_step_button();
 
 // Start LED blink (non-blocking)
 void io_blink_led_start();

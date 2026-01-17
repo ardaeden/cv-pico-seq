@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.13)
 
 #set(PICO_BOARD pico_w)
 
-# Load Pico SDK
-include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+# Set Pico SDK Path
+set(PICO_SDK_PATH /home/ardaeden/Dev/sdk/pico-sdk)
+include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
 # Proje adı
 project(cv-pico-seq C CXX ASM)
