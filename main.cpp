@@ -184,8 +184,8 @@ int main() {
         int new_step = (int)edit_step + encoder_delta;
         if (new_step < 0)
           new_step = 0;
-        if (new_step > 15)
-          new_step = 15;
+        if (new_step > 31)
+          new_step = 31;
         edit_step = (uint32_t)new_step;
         ui_show_edit_step(edit_step, seq_get_note(edit_step));
 
@@ -216,10 +216,10 @@ int main() {
           int new_steps = (int)current_steps + encoder_delta;
           if (new_steps < 1)
             new_steps = 1;
-          if (new_steps > 16)
-            new_steps = 16;
+          if (new_steps > 32)
+            new_steps = 32;
           seq_set_steps((uint32_t)new_steps);
-          ui_show_steps(seq_is_playing() ? seq_current_step() : 16,
+          ui_show_steps(seq_is_playing() ? seq_current_step() : 32,
                         (uint32_t)new_steps);
         } else {
           if (clock_get_source() == CLOCK_INTERNAL) {

@@ -27,6 +27,7 @@ void seq_set_note(uint32_t step, uint8_t note);
 
 // Gate enable/disable operations
 bool seq_get_gate_enabled(uint32_t step);
+uint32_t seq_get_gate_mask();
 void seq_toggle_gate(uint32_t step);
 
 void seq_save_pattern_ram_only(uint8_t slot);

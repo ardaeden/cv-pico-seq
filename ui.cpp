@@ -16,7 +16,7 @@ static uint8_t fb[128 * 8];
 
 static int32_t ui_edit_step_prev_step = -1;
 static uint8_t ui_edit_step_prev_note = 0;
-static uint16_t ui_edit_step_prev_gate = 0xFFFF;
+static uint32_t ui_edit_step_prev_gate = 0xFFFFFFFF;
 static uint8_t ui_edit_note_prev_note = 255;
 static bool ui_edit_note_prev_gate = false;
 static uint32_t ui_edit_note_prev_step = 255;
@@ -400,41 +400,100 @@ static void fill_rect(int x0, int y0, int w, int h) {
   }
 }
 
+static void draw_rect_outline_dither(int x0, int y0, int w, int h) {
+  for (int x = x0; x < x0 + w; ++x) {
+    if ((x + y0) % 2 == 0)
+      set_pixel(x, y0);
+    if ((x + y0 + h - 1) % 2 == 0)
+      set_pixel(x, y0 + h - 1);
+  }
+  for (int y = y0; y < y0 + h; ++y) {
+    if ((x0 + y) % 2 == 0)
+      set_pixel(x0, y);
+    if ((x0 + w - 1 + y) % 2 == 0)
+      set_pixel(x0 + w - 1, y);
+  }
+}
+
+static void fill_rect_dither(int x0, int y0, int w, int h) {
+  for (int y = y0; y < y0 + h; ++y) {
+    for (int x = x0; x < x0 + w; ++x) {
+      if ((x + y) % 2 == 0) {
+        set_pixel(x, y);
+      }
+    }
+  }
+}
+
 void ui_show_steps(uint32_t current_step, uint32_t steps) {
   if (steps == 0)
     return;
-  const int sq = 12;
-  const int spacing = 4;
+
+  // 4 rows of 8 steps = 32 steps
+  // Each row split into two groups of 4 (XXXX XXXX)
+  // Making boxes even wider and narrowing the gaps
+  const int sq_w = 13;
+  const int sq_h = 8;
+  const int spacing_x = 2;
+  const int spacing_y = 5;
+  const int group_gap = 8;
   const int cols = 8;
-  const int total_w = cols * sq + (cols - 1) * spacing; // 124
+
+  // Total width: 8 boxes + 6 small gaps + 1 large gap
+  const int total_w =
+      (8 * sq_w) + (6 * spacing_x) + group_gap; // 104 + 12 + 8 = 124
   const int left = (128 - total_w) / 2;
-  // Move to bottom: screen is 64 pixels high, 2 rows of squares with gap
-  const int bottom_y = 64 - sq;        // Bottom row at very bottom
-  const int top_y = bottom_y - sq - 8; // Top row above with 8px gap
+
+  // Keep the relaxed gap from BPM area
+  const int start_y = 13;
 
   // Clear grid area
-  clear_region(left - 1, top_y - 1, total_w + 2, (sq * 2) + 8 + 2);
+  clear_region(0, start_y - 2, 128, 51);
 
-  for (int i = 0; i < (int)steps && i < 16; ++i) {
+  for (int i = 0; i < 32; ++i) {
     int col = i % cols;
     int row = i / cols;
-    int x = left + col * (sq + spacing);
-    int y = (row == 0) ? top_y : bottom_y;
 
-    bool is_current = (i == (int)current_step && current_step < steps);
-    bool gate_enabled = seq_get_gate_enabled(i);
-
-    if (is_current) {
-      fill_rect(x + 2, y + 2, sq - 4, sq - 4);
-    } else {
-      draw_rect_outline(x, y, sq, sq);
+    // Calculate X with group gap
+    int x = left + col * (sq_w + spacing_x);
+    if (col >= 4) {
+      x += (group_gap - spacing_x);
     }
 
-    if (gate_enabled) {
+    int y = start_y + row * (sq_h + spacing_y);
+
+    bool is_active = (i < (int)steps);
+    bool is_current = (i == (int)current_step);
+    bool gate_enabled = seq_get_gate_enabled(i);
+
+    if (is_active) {
       if (is_current) {
-        clear_region(x + 3, y + 3, 6, 6);
+        fill_rect(x, y, sq_w, sq_h);
       } else {
-        fill_rect(x + 3, y + 3, 6, 6);
+        draw_rect_outline(x, y, sq_w, sq_h);
+      }
+
+      if (gate_enabled) {
+        if (is_current) {
+          clear_region(x + 5, y + 2, 3, 4);
+        } else {
+          fill_rect(x + 5, y + 2, 3, 4);
+        }
+      }
+    } else {
+      // Dithered Ghost Step
+      if (is_current) {
+        fill_rect_dither(x, y, sq_w, sq_h);
+      } else {
+        draw_rect_outline_dither(x, y, sq_w, sq_h);
+      }
+
+      if (gate_enabled) {
+        if (is_current) {
+          clear_region(x + 5, y + 2, 3, 4);
+        } else {
+          fill_rect_dither(x + 5, y + 2, 3, 4);
+        }
       }
     }
   }
@@ -452,6 +511,10 @@ static void note_to_string(uint8_t note, char *buf) {
 }
 
 void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
+  // Paging logic: Page 1 (0-15), Page 2 (16-31)
+  uint32_t page = selected_step / 16;
+  uint32_t start_idx = page * 16;
+
   const int cols = 8;
   const int sq = 12;
   const int spacing = 4;
@@ -461,18 +524,24 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   const int top_y = bottom_y - sq - 8;
 
   bool first_draw = (ui_edit_step_prev_step == -1);
+  // Also force redraw if page changed
+  bool page_changed =
+      (!first_draw && ((uint32_t)ui_edit_step_prev_step / 16 != page));
 
-  if (first_draw) {
+  if (first_draw || page_changed) {
     ssd1306_clear_fb();
-    ui_draw_text(0, 0, "STEP SELECT");
+    char header[32];
+    sprintf(header, "STEP SELECT (PAGE %d)", page + 1);
+    ui_draw_text(0, 0, header);
 
     for (int i = 0; i < 16; ++i) {
+      uint32_t global_idx = start_idx + i;
       int col = i % cols;
       int row = i / cols;
       int x = left + col * (sq + spacing);
       int step_y = (row == 0) ? top_y : bottom_y;
-      bool is_selected = (i == (int)selected_step);
-      bool gate_enabled = seq_get_gate_enabled(i);
+      bool is_selected = (global_idx == selected_step);
+      bool gate_enabled = seq_get_gate_enabled(global_idx);
 
       if (is_selected) {
         draw_rect_outline(x, step_y, sq, sq);
@@ -489,15 +558,13 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   } else {
     clear_region(0, 16, 128, 8);
 
-    uint16_t current_gate_mask = 0;
-    for (int i = 0; i < 16; i++) {
-      if (seq_get_gate_enabled(i))
-        current_gate_mask |= (1 << i);
-    }
+    uint32_t current_gate_mask = seq_get_gate_mask();
 
     if (ui_edit_step_prev_step != (int32_t)selected_step) {
-      int old_col = ui_edit_step_prev_step % cols;
-      int old_row = ui_edit_step_prev_step / cols;
+      // Clear old selected step visual (on current page)
+      int old_local_idx = ui_edit_step_prev_step % 16;
+      int old_col = old_local_idx % cols;
+      int old_row = old_local_idx / cols;
       int old_x = left + old_col * (sq + spacing);
       int old_y = (old_row == 0) ? top_y : bottom_y;
       clear_region(old_x, old_y, sq, sq);
@@ -507,8 +574,10 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
         fill_rect(old_x + 4, old_y + 4, 4, 4);
       }
 
-      int new_col = selected_step % cols;
-      int new_row = selected_step / cols;
+      // Draw new selected step visual
+      int new_local_idx = selected_step % 16;
+      int new_col = new_local_idx % cols;
+      int new_row = new_local_idx / cols;
       int new_x = left + new_col * (sq + spacing);
       int new_y = (new_row == 0) ? top_y : bottom_y;
       clear_region(new_x, new_y, sq, sq);
@@ -518,8 +587,9 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
         fill_rect(new_x + 3, new_y + 3, 6, 6);
       }
     } else if (current_gate_mask != ui_edit_step_prev_gate) {
-      int col = selected_step % cols;
-      int row = selected_step / cols;
+      int local_idx = selected_step % 16;
+      int col = local_idx % cols;
+      int row = local_idx / cols;
       int x = left + col * (sq + spacing);
       int y = (row == 0) ? top_y : bottom_y;
       clear_region(x, y, sq, sq);
@@ -539,7 +609,7 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   sprintf(buf, "Step:%02d  Note:%s", selected_step + 1, note_str);
   ui_draw_text(0, 2, buf);
 
-  if (!first_draw) {
+  if (!first_draw || page_changed) {
     ui_edit_step_prev_step = selected_step;
     ui_edit_step_prev_note = note;
   }
