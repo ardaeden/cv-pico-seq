@@ -148,7 +148,8 @@ bool clock_consume_step() {
 void clock_set_bpm(uint32_t bpm) {
   uint64_t us_per_quarter = 60000000ULL / (bpm ? bpm : 120);
   clock_interval_us = static_cast<uint32_t>(us_per_quarter / 24);
-  gate_duration_us = clock_interval_us / 2;
+  // 50% duty cycle for a 16th note (one step = 6 ticks, so 3 ticks)
+  gate_duration_us = clock_interval_us * 3;
 }
 
 void clock_init() {
