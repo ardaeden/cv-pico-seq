@@ -1,5 +1,6 @@
 #pragma once
 
+#include "clock.h"
 #include <cstdint>
 
 // Initialize the SSD1306 display (I2C0, SDA=GP4, SCL=GP5, addr=0x3C)
@@ -24,8 +25,11 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note);
 // Display edit mode: note editing
 void ui_show_edit_note(uint32_t step, uint8_t note);
 
-// Display pattern select mode (slot 0-9)
-void ui_show_pattern_select(uint8_t slot);
+// Show Pattern Select Screen
+void ui_show_pattern_select(uint8_t current_slot);
+
+// Show Settings Screen
+void ui_show_settings(int current_option, ClockSource clock_source);
 
 // Low-level drawing functions for custom animations
 void clear_region(int x, int y, int w, int h);

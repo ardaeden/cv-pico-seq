@@ -52,7 +52,8 @@ The system is built around the **Raspberry Pi Pico**.
 | **Step Count**    | GP8      | Input  | Hold + Encoder to set pattern length / Press in Edit Mode to toggle Gate |
 | **Edit Mode**     | GP10     | Input  | Enter/Exit Step Edit modes |
 | **Pattern Select**| GP11     | Input  | Enter Pattern Select / Queue Mode |
-| **Save**          | GP12     | Input  | Save current pattern to slot (in Pattern Select mode) |
+| **Save / Set**    | GP12     | Input  | Enter Settings / Save pattern (in Select mode) |
+| **Ext Clock In**  | GP21     | Input  | External Clock Input (Active-LOW) |
 | **Encoder SW**    | GP13     | Input  | Confirm / Toggle Note Edit / BPM Step (1x/10x) |
 | **Encoder CLK**   | GP14     | Input  | Rotary Encoder Clock |
 | **Encoder DT**    | GP15     | Input  | Rotary Encoder Data |
@@ -71,9 +72,16 @@ The system is built around the **Raspberry Pi Pico**.
 | **Step Count (GP8)** | **Hold** + Encoder: Set Pattern Length | **Press**: Toggle Step Gate | - |
 | **Edit Mode (GP10)** | Enter Step Edit Mode | Exit to Main Screen | Enter Step Edit Mode |
 | **Pattern Select (GP11)**| Enter Pattern Select Mode | Enter Pattern Select Mode | Exit to Main Screen |
-| **Save (GP12)** | - | - | **Press**: Save to Slot |
+| **Save / Set (GP12)** | Enter Settings Mode | Enter Settings Mode | **Press**: Save to Slot |
 | **Encoder (Rotate)** | Adjust BPM | Select Step / Adjust Pitch | Select Pattern Slot (0-9) |
 | **Encoder (Press)** | Toggle BPM Step (1x / 10x) | Toggle Step vs. Note Edit | Load / Queue Pattern |
+
+#### ⚙️ Settings Mode (via GP12)
+| Action | Function |
+|:---|:---|
+| **Encoder Button** | Toggle Clock Source (**INTERNAL** / **EXTERNAL**) |
+| **Save Button** | Exit Settings |
+| **Stop Button** | Exit Settings |
 
 ---
 

@@ -78,9 +78,12 @@ static int char_to_font_index(char c) {
     return 11;
   if (c >= 'A' && c <= 'Z')
     return 12 + (c - 'A');
-  if (c == 'a') return 42;
-  if (c == 'n') return 43;
-  if (c == 'o') return 44;
+  if (c == 'a')
+    return 42;
+  if (c == 'n')
+    return 43;
+  if (c == 'o')
+    return 44;
   if (c >= 'b' && c <= 'z') // Fallback for other lowercase
     return 12 + (c - 'a');
   if (c == '#')
@@ -145,8 +148,6 @@ void ssd1306_update() {
     i2c_write_blocking(i2c0, SSD1306_ADDR, buf, 129, false);
   }
 }
-
-
 
 static void ui_draw_char(int x, int page, char c) {
   int idx = char_to_font_index(c);
@@ -256,16 +257,16 @@ void ui_boot_animation() {
     ssd1306_clear_fb();
     // Re-draw border lines
     for (int x = 0; x < 128; x++) {
-        set_pixel(x, 0);
-        set_pixel(x, 63);
+      set_pixel(x, 0);
+      set_pixel(x, 63);
     }
-    
+
     int brand_w = (5 * scale + 2) * 4;
     int brand_x = (128 - brand_w) / 2;
     int brand_y = (64 - (7 * scale)) / 2;
-    
+
     for (int i = 0; i < 4; i++) {
-        draw_scaled_char(brand_x + i * (5 * scale + 2), brand_y, brand[i], scale);
+      draw_scaled_char(brand_x + i * (5 * scale + 2), brand_y, brand[i], scale);
     }
     ssd1306_update();
     sleep_ms(50);
@@ -273,36 +274,36 @@ void ui_boot_animation() {
 
   // 4. Glitch Effect
   for (int g = 0; g < 5; g++) {
-      for (int i = 0; i < 20; i++) {
-          set_pixel(rand() % 128, rand() % 64);
-      }
-      ssd1306_update();
-      sleep_ms(30);
+    for (int i = 0; i < 20; i++) {
+      set_pixel(rand() % 128, rand() % 64);
+    }
+    ssd1306_update();
+    sleep_ms(30);
   }
 
   // 5. Add "CV Sequencer" subtitle
   ssd1306_clear_fb();
   // Border lines
   for (int x = 0; x < 128; x++) {
-      set_pixel(x, 0);
-      set_pixel(x, 63);
+    set_pixel(x, 0);
+    set_pixel(x, 63);
   }
-  
+
   // aAOn at scale 4
   int scale = 4;
   int brand_w = (5 * scale + 2) * 4;
   int brand_x = (128 - brand_w) / 2;
   int brand_y = 10;
   for (int i = 0; i < 4; i++) {
-      draw_scaled_char(brand_x + i * (5 * scale + 2), brand_y, brand[i], scale);
+    draw_scaled_char(brand_x + i * (5 * scale + 2), brand_y, brand[i], scale);
   }
-  
+
   // CV Sequencer at scale 1
   const char *sub = "CV SEQUENCER";
   int sub_w = strlen(sub) * 6;
   int sub_x = (128 - sub_w) / 2;
   ui_draw_text(sub_x, 6, sub);
-  
+
   ssd1306_update();
   sleep_ms(1500);
 
@@ -618,5 +619,25 @@ void ui_show_pattern_select(uint8_t slot) {
   }
 
   ui_pattern_select_prev_slot = slot;
+  ssd1306_update();
+}
+
+void ui_show_settings(int current_option, ClockSource clock_source) {
+  ssd1306_clear_fb();
+  ui_draw_text(36, 0, "SETTINGS");
+
+  // For now we only have one option: CLOCK
+  char buf[32];
+  sprintf(buf, "%sCLOCK:", (current_option == 0) ? ">> " : "   ");
+  ui_draw_text(0, 3, buf);
+
+  const char *source_str =
+      (clock_source == CLOCK_INTERNAL) ? "INTERNAL" : "EXTERNAL";
+  sprintf(buf, "   %s", source_str);
+  ui_draw_text(0, 5, buf);
+
+  // Draw help text at bottom
+  ui_draw_text(0, 7, "Enc-Btn to Toggle");
+
   ssd1306_update();
 }

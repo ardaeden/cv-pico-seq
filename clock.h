@@ -3,6 +3,10 @@
 #include <cstdint>
 
 // Configure clock interval based on BPM and PPQN.
+enum ClockSource { CLOCK_INTERNAL, CLOCK_EXTERNAL };
+
+void clock_set_source(ClockSource source);
+ClockSource clock_get_source();
 void clock_set_bpm(uint32_t bpm);
 
 // Launch the timing core (core1) that generates ticks.
