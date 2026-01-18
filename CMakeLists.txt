@@ -6,8 +6,21 @@ cmake_minimum_required(VERSION 3.13)
 set(PICO_SDK_PATH /home/ardaeden/Dev/sdk/pico-sdk)
 include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
-# Proje adı
-project(cv-pico-seq C CXX ASM)
+# Proje adı ve versiyonu
+set(FW_VERSION_MAJOR 0)
+set(FW_VERSION_MINOR 1)
+set(FW_VERSION_PATCH 0)
+project(cv-pico-seq 
+    VERSION ${FW_VERSION_MAJOR}.${FW_VERSION_MINOR}.${FW_VERSION_PATCH}
+    LANGUAGES C CXX ASM
+)
+
+add_compile_definitions(
+    FIRMWARE_VERSION_MAJOR=${FW_VERSION_MAJOR}
+    FIRMWARE_VERSION_MINOR=${FW_VERSION_MINOR}
+    FIRMWARE_VERSION_PATCH=${FW_VERSION_PATCH}
+    FIRMWARE_VERSION_STR="v${FW_VERSION_MAJOR}.${FW_VERSION_MINOR}.${FW_VERSION_PATCH}"
+)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)

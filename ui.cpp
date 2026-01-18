@@ -322,6 +322,13 @@ void ui_boot_animation() {
   int sub_x = (128 - sub_w) / 2;
   ui_draw_text(sub_x, 6, sub);
 
+  // Firmware Version
+  char ver_buf[16];
+  snprintf(ver_buf, sizeof(ver_buf), "%s", FIRMWARE_VERSION_STR);
+  int ver_w = strlen(ver_buf) * 6;
+  int ver_x = (128 - ver_w) / 2;
+  ui_draw_text(ver_x, 7, ver_buf);
+
   ssd1306_update();
   sleep_ms(1500);
 
@@ -447,13 +454,13 @@ static void fill_rect(int x0, int y0, int w, int h) {
 
 static void draw_rect_outline_dither(int x0, int y0, int w, int h) {
   for (int x = x0; x < x0 + w; ++x) {
-    if ((x + y0) % 2 == 0)
+    if ((x + y0) % 3 == 0)
       set_pixel(x, y0);
     if ((x + y0 + h - 1) % 2 == 0)
       set_pixel(x, y0 + h - 1);
   }
   for (int y = y0; y < y0 + h; ++y) {
-    if ((x0 + y) % 2 == 0)
+    if ((x0 + y) % 3 == 0)
       set_pixel(x0, y);
     if ((x0 + w - 1 + y) % 2 == 0)
       set_pixel(x0 + w - 1, y);
@@ -463,7 +470,7 @@ static void draw_rect_outline_dither(int x0, int y0, int w, int h) {
 static void fill_rect_dither(int x0, int y0, int w, int h) {
   for (int y = y0; y < y0 + h; ++y) {
     for (int x = x0; x < x0 + w; ++x) {
-      if ((x + y) % 2 == 0) {
+      if ((x + y) % 3 == 0) {
         set_pixel(x, y);
       }
     }
@@ -561,12 +568,20 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   uint32_t start_idx = page * 16;
 
   const int cols = 8;
-  const int sq = 12;
-  const int spacing = 4;
-  const int total_w = cols * sq + (cols - 1) * spacing;
+  const int sq = 13;
+  const int spacing = 2;
+  const int group_gap = 6;
+  const int total_w = (8 * sq) + (6 * spacing) + group_gap;
   const int left = (128 - total_w) / 2;
   const int bottom_y = 64 - sq;
   const int top_y = bottom_y - sq - 8;
+
+  auto get_step_x = [&](int col) {
+    int x = left + col * (sq + spacing);
+    if (col >= 4)
+      x += (group_gap - spacing);
+    return x;
+  };
 
   bool first_draw = (ui_edit_step_prev_step == -1);
   // Also force redraw if page changed
@@ -576,27 +591,45 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   if (first_draw || page_changed) {
     ssd1306_clear_fb();
     char header[32];
-    sprintf(header, "STEP SELECT (PAGE %d)", page + 1);
+    sprintf(header, "STEP EDIT P:%d", page + 1);
     ui_draw_text(0, 0, header);
+
+    uint32_t total_steps = seq_get_steps();
 
     for (int i = 0; i < 16; ++i) {
       uint32_t global_idx = start_idx + i;
       int col = i % cols;
       int row = i / cols;
-      int x = left + col * (sq + spacing);
+      int x = get_step_x(col);
       int step_y = (row == 0) ? top_y : bottom_y;
       bool is_selected = (global_idx == selected_step);
+      bool is_active = (global_idx < total_steps);
       bool gate_enabled = seq_get_gate_enabled(global_idx);
 
-      if (is_selected) {
-        draw_rect_outline(x, step_y, sq, sq);
-        if (gate_enabled) {
-          fill_rect(x + 3, step_y + 3, 6, 6);
+      if (is_active) {
+        if (is_selected) {
+          draw_rect_outline(x, step_y, sq, sq);
+          if (gate_enabled) {
+            fill_rect(x + 3, step_y + 3, 7, 7);
+          }
+        } else {
+          draw_rect_outline(x + 2, step_y + 2, sq - 4, sq - 4);
+          if (gate_enabled) {
+            fill_rect(x + 4, step_y + 4, 5, 5);
+          }
         }
       } else {
-        draw_rect_outline(x + 2, step_y + 2, sq - 4, sq - 4);
-        if (gate_enabled) {
-          fill_rect(x + 4, step_y + 4, 4, 4);
+        // Ghost steps
+        if (is_selected) {
+          draw_rect_outline_dither(x, step_y, sq, sq);
+          if (gate_enabled) {
+            fill_rect_dither(x + 3, step_y + 3, 7, 7);
+          }
+        } else {
+          draw_rect_outline_dither(x + 2, step_y + 2, sq - 4, sq - 4);
+          if (gate_enabled) {
+            fill_rect_dither(x + 4, step_y + 4, 5, 5);
+          }
         }
       }
     }
@@ -604,44 +637,73 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
     clear_region(0, 16, 128, 8);
 
     uint32_t current_gate_mask = seq_get_gate_mask();
+    uint32_t total_steps = seq_get_steps();
 
     if (ui_edit_step_prev_step != (int32_t)selected_step) {
       // Clear old selected step visual (on current page)
       int old_local_idx = ui_edit_step_prev_step % 16;
+      uint32_t old_global_idx = (uint32_t)ui_edit_step_prev_step;
       int old_col = old_local_idx % cols;
       int old_row = old_local_idx / cols;
-      int old_x = left + old_col * (sq + spacing);
+      int old_x = get_step_x(old_col);
       int old_y = (old_row == 0) ? top_y : bottom_y;
       clear_region(old_x, old_y, sq, sq);
-      bool old_gate = seq_get_gate_enabled(ui_edit_step_prev_step);
-      draw_rect_outline(old_x + 2, old_y + 2, sq - 4, sq - 4);
-      if (old_gate) {
-        fill_rect(old_x + 4, old_y + 4, 4, 4);
+      bool old_gate = seq_get_gate_enabled(old_global_idx);
+      bool old_active = (old_global_idx < total_steps);
+
+      if (old_active) {
+        draw_rect_outline(old_x + 2, old_y + 2, sq - 4, sq - 4);
+        if (old_gate) {
+          fill_rect(old_x + 4, old_y + 4, 5, 5);
+        }
+      } else {
+        draw_rect_outline_dither(old_x + 2, old_y + 2, sq - 4, sq - 4);
+        if (old_gate) {
+          fill_rect_dither(old_x + 4, old_y + 4, 5, 5);
+        }
       }
 
       // Draw new selected step visual
       int new_local_idx = selected_step % 16;
       int new_col = new_local_idx % cols;
       int new_row = new_local_idx / cols;
-      int new_x = left + new_col * (sq + spacing);
+      int new_x = get_step_x(new_col);
       int new_y = (new_row == 0) ? top_y : bottom_y;
       clear_region(new_x, new_y, sq, sq);
       bool new_gate = seq_get_gate_enabled(selected_step);
-      draw_rect_outline(new_x, new_y, sq, sq);
-      if (new_gate) {
-        fill_rect(new_x + 3, new_y + 3, 6, 6);
+      bool new_active = (selected_step < total_steps);
+
+      if (new_active) {
+        draw_rect_outline(new_x, new_y, sq, sq);
+        if (new_gate) {
+          fill_rect(new_x + 3, new_y + 3, 7, 7);
+        }
+      } else {
+        draw_rect_outline_dither(new_x, new_y, sq, sq);
+        if (new_gate) {
+          fill_rect_dither(new_x + 3, new_y + 3, 7, 7);
+        }
       }
     } else if (current_gate_mask != ui_edit_step_prev_gate) {
       int local_idx = selected_step % 16;
       int col = local_idx % cols;
       int row = local_idx / cols;
-      int x = left + col * (sq + spacing);
+      int x = get_step_x(col);
       int y = (row == 0) ? top_y : bottom_y;
       clear_region(x, y, sq, sq);
       bool gate = seq_get_gate_enabled(selected_step);
-      draw_rect_outline(x, y, sq, sq);
-      if (gate) {
-        fill_rect(x + 3, y + 3, 6, 6);
+      bool active = (selected_step < total_steps);
+
+      if (active) {
+        draw_rect_outline(x, y, sq, sq);
+        if (gate) {
+          fill_rect(x + 3, y + 3, 7, 7);
+        }
+      } else {
+        draw_rect_outline_dither(x, y, sq, sq);
+        if (gate) {
+          fill_rect_dither(x + 3, y + 3, 7, 7);
+        }
       }
     }
 
@@ -651,7 +713,7 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   char buf[32];
   char note_str[8];
   note_to_string(note, note_str);
-  sprintf(buf, "Step:%02d  Note:%s", selected_step + 1, note_str);
+  sprintf(buf, "%02d %s", selected_step + 1, note_str);
   ui_draw_text(0, 2, buf);
 
   if (!first_draw || page_changed) {
@@ -737,8 +799,9 @@ void ui_show_settings(int current_option, ClockSource clock_source) {
   sprintf(buf, "   %s", source_str);
   ui_draw_text(0, 5, buf);
 
-  // Draw help text at bottom
-  ui_draw_text(0, 7, "Enc-Btn to Toggle");
+  // Firmware Version (bottom-right)
+  ui_draw_text(128 - (strlen(FIRMWARE_VERSION_STR) * 6), 7,
+               FIRMWARE_VERSION_STR);
 
   ssd1306_update();
 }
