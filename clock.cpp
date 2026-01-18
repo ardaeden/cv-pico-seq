@@ -14,6 +14,7 @@ volatile bool tick_flag = false;
 
 constexpr uint GATE_PIN = 6;
 constexpr uint CLOCK_OUT_PIN = 22;
+constexpr uint DAC_CS_PIN = 17;
 volatile bool gate_active = false;
 volatile uint64_t gate_start_us = 0;
 volatile bool gate_enabled = false;
@@ -27,7 +28,9 @@ volatile uint32_t internal_tick_count = 0;
 volatile bool step_advanced_flag = false;
 
 constexpr uint8_t MIDI_BASE = 36;
-constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
+// 12-bit DAC (4096), gain 2x (4.096V). 1V = 1000 counts.
+// 1V / 12 semitones = 1000 / 12 = 83.3333f counts per semitone.
+constexpr float DAC_PER_SEMITONE = 1000.0f / 12.0f;
 
 // Nuance values for Velocity (pp, p, mf, f, ff) - Expanded range for better
 // contrast
@@ -56,9 +59,9 @@ void handle_tick() {
         uint16_t command_a = 0x1000 | (dac_val & 0x0FFF);
         uint8_t buf_a[2] = {(uint8_t)(command_a >> 8),
                             (uint8_t)(command_a & 0xFF)};
-        gpio_put(17, false); // DAC_CS_PIN
+        gpio_put(DAC_CS_PIN, false);
         spi_write_blocking(spi0, buf_a, 2);
-        gpio_put(17, true);
+        gpio_put(DAC_CS_PIN, true);
 
         // Set Velocity (Channel B) - 0x9000 for 2x gain
         uint8_t velo_idx = seq_get_velocity(step);
@@ -66,9 +69,9 @@ void handle_tick() {
         uint16_t command_b = 0x9000 | (velo_dac & 0x0FFF);
         uint8_t buf_b[2] = {(uint8_t)(command_b >> 8),
                             (uint8_t)(command_b & 0xFF)};
-        gpio_put(17, false); // DAC_CS_PIN
+        gpio_put(DAC_CS_PIN, false);
         spi_write_blocking(spi0, buf_b, 2);
-        gpio_put(17, true);
+        gpio_put(DAC_CS_PIN, true);
 
         restore_interrupts(save);
 
@@ -97,8 +100,6 @@ void handle_tick() {
       internal_tick_count = 0;
   }
 }
-
-constexpr uint DAC_CS_PIN = 17;
 
 struct repeating_timer timer_state;
 

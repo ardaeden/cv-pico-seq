@@ -12,7 +12,7 @@ constexpr uint SCL_PIN = 27;
 constexpr uint8_t PATTERN_STORAGE_SIZE =
     73; // 32 notes + 32 velo + 4 gate + 4 tie + 1 step
 constexpr uint8_t NUM_PATTERNS = 25; // User requested 25 slots
-constexpr uint8_t MAGIC_BYTE = 0xAC;
+constexpr uint8_t MAGIC_BYTE = 0xAD;
 constexpr uint16_t MAGIC_ADDR = 2000; // Near the end of 2KB EEPROM
 
 bool initialized = false;
