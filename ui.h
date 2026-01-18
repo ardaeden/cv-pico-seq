@@ -8,7 +8,7 @@ enum TransportState { TSTATE_STOP, TSTATE_PLAY, TSTATE_PAUSE };
 // Initialize the SSD1306 display (I2C0, SDA=GP4, SCL=GP5, addr=0x3C)
 void ui_init();
 
-// Boot animation (16 steps wave + pulsing effect)
+// Boot animation: digital noise sweep, logo reveal, and glitch effects
 void ui_boot_animation();
 
 // Clear display framebuffer
@@ -42,4 +42,5 @@ void ui_show_settings(int current_option, ClockSource clock_source);
 // Low-level drawing functions for custom animations
 void clear_region(int x, int y, int w, int h);
 void draw_scaled_char(int x0, int y0, char c, int scale);
+void draw_scaled_text(int x, int y, const char *text, int scale);
 void ssd1306_update();

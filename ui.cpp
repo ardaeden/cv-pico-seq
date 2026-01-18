@@ -17,7 +17,6 @@ static const uint8_t SSD1306_ADDR = 0x3C;
 static uint8_t fb[128 * 8];
 
 static int32_t ui_edit_step_prev_step = -1;
-static uint8_t ui_edit_step_prev_note = 0;
 static uint32_t ui_edit_step_prev_gate = 0xFFFFFFFF;
 static uint8_t ui_edit_note_prev_note = 255;
 static bool ui_edit_note_prev_gate = false;
@@ -256,93 +255,102 @@ void ui_init() {
 }
 
 void ui_boot_animation() {
-  // Brand: aAOn
-  // Subtitle: CV Sequencer
+  const char *brand = "aAOn";
+  const char *sub = "CV SEQUENCER";
+  char ver_buf[16];
+  snprintf(ver_buf, sizeof(ver_buf), "%s", FIRMWARE_VERSION_STR);
 
-  // 1. Line expansion from center
-  for (int w = 0; w < 128; w += 8) {
-    ssd1306_clear_fb();
-    int x0 = 64 - w / 2;
-    for (int x = x0; x < x0 + w; x++) {
-      set_pixel(x, 32);
-    }
-    ssd1306_update();
-    sleep_ms(10);
-  }
-
-  // 2. Line splits and moves to top/bottom
-  for (int y = 0; y < 32; y += 4) {
-    ssd1306_clear_fb();
-    for (int x = 0; x < 128; x++) {
-      set_pixel(x, 32 - y);
-      set_pixel(x, 32 + y);
+  // Phase 1: Noise Sweep (Digital Rain style)
+  for (int frame = 0; frame < 20; frame++) {
+    for (int i = 0; i < 150; i++) {
+      int x = rand() % 128;
+      int y = rand() % 64;
+      set_pixel(x, y);
     }
     ssd1306_update();
     sleep_ms(15);
+    if (frame % 2 == 0) {
+      // Partially clear some bits for "raining" effect
+      for (int i = 0; i < 100; i++) {
+        clear_pixel(rand() % 128, rand() % 64);
+      }
+    }
   }
 
-  // 3. "aAOn" Fades in with scale pulse
-  const char *brand = "aAOn";
-  for (int scale = 1; scale <= 4; scale++) {
-    ssd1306_clear_fb();
-    // Re-draw border lines
+  // Phase 2: Logo Snap Reveal
+  ssd1306_clear_fb();
+  int scale = 3;
+  int brand_w = (5 * scale + 2) * 4;
+  int brand_x = (128 - brand_w) / 2;
+  int brand_y = 6;
+
+  for (int i = 0; i < 4; i++) {
+    // Letters snap in from random heights
+    int start_y = (rand() % 60) - 20;
+    for (int step = 0; step < 5; step++) {
+      int cur_y = start_y + (brand_y - start_y) * (step + 1) / 5;
+
+      // Clear vertical strip for this character
+      clear_region(brand_x + i * (5 * scale + 2), 0, (5 * scale + 2), 64);
+      draw_scaled_char(brand_x + i * (5 * scale + 2), cur_y, brand[i], scale);
+      ssd1306_update();
+      sleep_ms(10);
+    }
+  }
+
+  // Phase 3: Digital Glitch (Brief horizontal shifts)
+  for (int g = 0; g < 8; g++) {
+    int line = rand() % 8;
+    int shift = (rand() % 16) - 8;
+
+    // Copy a page to a temp buffer, shift it, and write back
+    uint8_t temp[128];
+    memcpy(temp, &fb[line * 128], 128);
+
     for (int x = 0; x < 128; x++) {
-      set_pixel(x, 0);
-      set_pixel(x, 63);
+      int src_x = (x - shift + 128) % 128;
+      fb[line * 128 + x] = temp[src_x];
     }
 
-    int brand_w = (5 * scale + 2) * 4;
-    int brand_x = (128 - brand_w) / 2;
-    int brand_y = (64 - (7 * scale)) / 2;
-
-    for (int i = 0; i < 4; i++) {
-      draw_scaled_char(brand_x + i * (5 * scale + 2), brand_y, brand[i], scale);
-    }
     ssd1306_update();
-    sleep_ms(50);
+    sleep_ms(20);
+
+    // Restore
+    memcpy(&fb[line * 128], temp, 128);
+    ssd1306_update();
   }
 
-  // 4. Glitch Effect
-  for (int g = 0; g < 5; g++) {
-    for (int i = 0; i < 20; i++) {
-      set_pixel(rand() % 128, rand() % 64);
-    }
+  // Phase 4: Info Reveal (Typewriter style)
+  int sub_w = strlen(sub) * 6;
+  int sub_x = (128 - sub_w) / 2;
+  int sub_y_page = 5;
+
+  for (size_t i = 1; i <= strlen(sub); i++) {
+    char temp_sub[16];
+    strncpy(temp_sub, sub, i);
+    temp_sub[i] = '\0';
+    ui_draw_text(sub_x, sub_y_page, temp_sub);
     ssd1306_update();
     sleep_ms(30);
   }
 
-  // 5. Add "CV Sequencer" subtitle
-  ssd1306_clear_fb();
-  // Border lines
-  for (int x = 0; x < 128; x++) {
-    set_pixel(x, 0);
-    set_pixel(x, 63);
-  }
-
-  // aAOn at scale 4
-  int scale = 4;
-  int brand_w = (5 * scale + 2) * 4;
-  int brand_x = (128 - brand_w) / 2;
-  int brand_y = 10;
-  for (int i = 0; i < 4; i++) {
-    draw_scaled_char(brand_x + i * (5 * scale + 2), brand_y, brand[i], scale);
-  }
-
-  // CV Sequencer at scale 1
-  const char *sub = "CV SEQUENCER";
-  int sub_w = strlen(sub) * 6;
-  int sub_x = (128 - sub_w) / 2;
-  ui_draw_text(sub_x, 6, sub);
-
-  // Firmware Version
-  char ver_buf[16];
-  snprintf(ver_buf, sizeof(ver_buf), "%s", FIRMWARE_VERSION_STR);
+  // Version Reveal
   int ver_w = strlen(ver_buf) * 6;
   int ver_x = (128 - ver_w) / 2;
   ui_draw_text(ver_x, 7, ver_buf);
-
   ssd1306_update();
-  sleep_ms(1500);
+
+  sleep_ms(1200);
+
+  // Exit with a vertical split
+  for (int h = 0; h < 32; h += 4) {
+    for (int x = 0; x < 128; x++) {
+      clear_pixel(x, 32 - h);
+      clear_pixel(x, 32 + h);
+    }
+    ssd1306_update();
+    sleep_ms(15);
+  }
 
   ssd1306_clear_fb();
   ssd1306_update();
@@ -353,7 +361,6 @@ void ui_clear() {
   ssd1306_update();
 
   ui_edit_step_prev_step = -1;
-  ui_edit_step_prev_note = 0;
   ui_edit_step_prev_gate = 0xFFFF;
   ui_edit_note_prev_note = 255;
   ui_edit_note_prev_gate = false;
@@ -438,7 +445,7 @@ void clear_region(int x0, int y0, int w, int h) {
 }
 
 // Helper: draw scaled text
-static void draw_scaled_text(int x, int y, const char *text, int scale) {
+void draw_scaled_text(int x, int y, const char *text, int scale) {
   for (const char *p = text; *p; ++p) {
     draw_scaled_char(x, y, *p, scale);
     x += (5 * scale) + 2;
@@ -732,7 +739,6 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
 
   if (!first_draw || page_changed) {
     ui_edit_step_prev_step = selected_step;
-    ui_edit_step_prev_note = note;
   }
 
   ssd1306_update();
