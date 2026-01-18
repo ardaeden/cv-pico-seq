@@ -26,8 +26,12 @@ void ui_show_steps(uint32_t current_step, uint32_t steps);
 // Display edit mode: step selection
 void ui_show_edit_step(uint32_t selected_step, uint8_t note);
 
-// Display edit mode: note editing
-void ui_show_edit_note(uint32_t step, uint8_t note);
+// Display edit mode: note/velocity editing
+void ui_show_edit_note(uint32_t step, uint8_t note, uint8_t velocity,
+                       bool edit_velocity = false);
+
+// HUD for quick adjustments
+void ui_show_velocity_hud(uint8_t velocity);
 
 // Show Pattern Select Screen
 void ui_show_pattern_select(uint8_t current_slot);

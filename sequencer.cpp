@@ -10,6 +10,7 @@ constexpr uint8_t NUM_PATTERN_SLOTS = 10;
 constexpr uint8_t PATTERN_SIZE = 32;
 
 uint8_t pattern_storage[NUM_PATTERN_SLOTS][PATTERN_SIZE] = {0};
+uint8_t velocity_storage[NUM_PATTERN_SLOTS][PATTERN_SIZE] = {0};
 uint32_t gate_mask_storage[NUM_PATTERN_SLOTS] = {0};
 uint8_t steps_storage[NUM_PATTERN_SLOTS] = {0};
 bool pattern_dirty[NUM_PATTERN_SLOTS] = {false};
@@ -21,6 +22,7 @@ struct SequencerState {
   uint32_t current_step;
   std::atomic<bool> playing;
   uint8_t notes[32];
+  uint8_t velocities[32]; // 0:pp, 1:p, 2:mf, 3:f, 4:ff
   uint32_t gate_mask;
 };
 
@@ -31,6 +33,8 @@ static SequencerState state = {120,
                                {48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66,
                                 67, 69, 71, 72, 74, 48, 50, 52, 54, 55, 57,
                                 59, 60, 62, 64, 66, 67, 69, 71, 72, 74},
+                               {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
                                0xFFFFFFFF};
 } // namespace
 
@@ -39,6 +43,9 @@ void seq_init() {
   state.steps = 32;
   state.current_step = (state.steps > 0) ? (state.steps - 1) : 31;
   state.playing.store(false);
+  for (int i = 0; i < 32; i++) {
+    state.velocities[i] = 2; // mf
+  }
 }
 
 bool seq_toggle_play() {
@@ -64,6 +71,8 @@ void seq_advance_step() {
       pending_pattern_slot >= 0) {
     if (pending_pattern_slot < NUM_PATTERN_SLOTS) {
       memcpy(state.notes, pattern_storage[pending_pattern_slot], PATTERN_SIZE);
+      memcpy(state.velocities, velocity_storage[pending_pattern_slot],
+             PATTERN_SIZE);
       state.gate_mask = gate_mask_storage[pending_pattern_slot];
       state.steps = steps_storage[pending_pattern_slot];
       if (state.steps < 1 || state.steps > 32) {
@@ -118,13 +127,27 @@ void seq_toggle_gate(uint32_t step) {
   state.gate_mask ^= (1UL << step);
 }
 
+uint8_t seq_get_velocity(uint32_t step) {
+  if (step >= 32)
+    step = 0;
+  return state.velocities[step];
+}
+
+void seq_set_velocity(uint32_t step, uint8_t velo_idx) {
+  if (step >= 32)
+    return;
+  if (velo_idx > 4)
+    velo_idx = 4;
+  state.velocities[step] = velo_idx;
+}
+
 void seq_init_flash() {
   eeprom_init();
 
   if (eeprom_is_initialized() && eeprom_has_valid_data()) {
     for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
-      eeprom_read_pattern(i, pattern_storage[i], &gate_mask_storage[i],
-                          &steps_storage[i]);
+      eeprom_read_pattern(i, pattern_storage[i], velocity_storage[i],
+                          &gate_mask_storage[i], &steps_storage[i]);
       if (steps_storage[i] < 1 || steps_storage[i] > 32) {
         steps_storage[i] = 32;
       }
@@ -192,14 +215,17 @@ void seq_init_flash() {
     memcpy(pattern_storage[9], pattern9, PATTERN_SIZE);
 
     for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
+      for (int j = 0; j < 32; j++) {
+        velocity_storage[i][j] = 2; // mf
+      }
       gate_mask_storage[i] = 0xFFFFFFFF;
       steps_storage[i] = 32;
     }
 
     if (eeprom_is_initialized()) {
       for (int i = 0; i < NUM_PATTERN_SLOTS; ++i) {
-        eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i],
-                             steps_storage[i]);
+        eeprom_write_pattern(i, pattern_storage[i], velocity_storage[i],
+                             gate_mask_storage[i], steps_storage[i]);
       }
       eeprom_mark_valid();
     }
@@ -210,6 +236,7 @@ void seq_save_pattern_ram_only(uint8_t slot) {
   if (slot >= NUM_PATTERN_SLOTS)
     return;
   memcpy(pattern_storage[slot], state.notes, PATTERN_SIZE);
+  memcpy(velocity_storage[slot], state.velocities, PATTERN_SIZE);
   gate_mask_storage[slot] = state.gate_mask;
   steps_storage[slot] = (uint8_t)state.steps;
   pattern_dirty[slot] = true;
@@ -221,8 +248,8 @@ void seq_flush_all_patterns_to_eeprom() {
   bool any_written = false;
   for (int i = 0; i < NUM_PATTERN_SLOTS; i++) {
     if (pattern_dirty[i]) {
-      eeprom_write_pattern(i, pattern_storage[i], gate_mask_storage[i],
-                           steps_storage[i]);
+      eeprom_write_pattern(i, pattern_storage[i], velocity_storage[i],
+                           gate_mask_storage[i], steps_storage[i]);
       pattern_dirty[i] = false;
       any_written = true;
     }
@@ -246,6 +273,7 @@ void seq_load_pattern(uint8_t slot) {
     return;
 
   memcpy(state.notes, pattern_storage[slot], PATTERN_SIZE);
+  memcpy(state.velocities, velocity_storage[slot], PATTERN_SIZE);
   state.gate_mask = gate_mask_storage[slot];
   state.steps = steps_storage[slot];
   if (state.steps < 1 || state.steps > 32) {

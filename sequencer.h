@@ -30,6 +30,10 @@ bool seq_get_gate_enabled(uint32_t step);
 uint32_t seq_get_gate_mask();
 void seq_toggle_gate(uint32_t step);
 
+// Velocity operations (0:pp, 1:p, 2:mf, 3:f, 4:ff)
+uint8_t seq_get_velocity(uint32_t step);
+void seq_set_velocity(uint32_t step, uint8_t velo_idx);
+
 void seq_save_pattern_ram_only(uint8_t slot);
 void seq_flush_all_patterns_to_eeprom();
 bool seq_has_dirty_patterns();

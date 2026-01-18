@@ -35,6 +35,7 @@ int main() {
     EDIT_NONE,
     EDIT_SELECT_STEP,
     EDIT_NOTE,
+    EDIT_VELOCITY,
     PATTERN_SELECT,
     SETTINGS
   };
@@ -129,8 +130,18 @@ int main() {
         edit_mode = EDIT_SELECT_STEP;
         edit_step = 0;
         ui_show_edit_step(edit_step, seq_get_note(edit_step));
-      } else if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE ||
-                 edit_mode == SETTINGS) {
+      } else if (edit_mode == EDIT_SELECT_STEP) {
+        edit_mode = EDIT_NONE;
+        ui_clear();
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
+                    current_tstate, false, encoder_step == 10);
+        ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
+                      seq_get_steps());
+      } else if (edit_mode == EDIT_NOTE || edit_mode == EDIT_VELOCITY) {
+        edit_mode = EDIT_SELECT_STEP;
+        ui_clear();
+        ui_show_edit_step(edit_step, seq_get_note(edit_step));
+      } else if (edit_mode == SETTINGS) {
         edit_mode = EDIT_NONE;
         ui_clear();
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
@@ -164,11 +175,16 @@ int main() {
       if (edit_mode == EDIT_SELECT_STEP) {
         edit_mode = EDIT_NOTE;
         ui_clear();
-        ui_show_edit_note(edit_step, seq_get_note(edit_step));
+        ui_show_edit_note(edit_step, seq_get_note(edit_step),
+                          seq_get_velocity(edit_step));
       } else if (edit_mode == EDIT_NOTE) {
-        edit_mode = EDIT_SELECT_STEP;
-        ui_clear();
-        ui_show_edit_step(edit_step, seq_get_note(edit_step));
+        edit_mode = EDIT_VELOCITY;
+        ui_show_edit_note(edit_step, seq_get_note(edit_step),
+                          seq_get_velocity(edit_step), true);
+      } else if (edit_mode == EDIT_VELOCITY) {
+        edit_mode = EDIT_NOTE;
+        ui_show_edit_note(edit_step, seq_get_note(edit_step),
+                          seq_get_velocity(edit_step), false);
       } else if (edit_mode == PATTERN_SELECT) {
         if (seq_is_playing()) {
           seq_queue_pattern(temp_pattern_slot);
@@ -189,7 +205,7 @@ int main() {
                                                      : CLOCK_INTERNAL);
           ui_show_settings(settings_option, clock_get_source());
         }
-      } else {
+      } else if (edit_mode == EDIT_NONE) {
         encoder_step = (encoder_step == 1) ? 10 : 1;
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
                     current_tstate, false, encoder_step == 10);
@@ -215,7 +231,19 @@ int main() {
         if (new_note > 84)
           new_note = 84;
         seq_set_note(edit_step, (uint8_t)new_note);
-        ui_show_edit_note(edit_step, (uint8_t)new_note);
+        ui_show_edit_note(edit_step, (uint8_t)new_note,
+                          seq_get_velocity(edit_step));
+
+      } else if (edit_mode == EDIT_VELOCITY) {
+        uint8_t current_velo = seq_get_velocity(edit_step);
+        int new_velo = (int)current_velo + encoder_delta;
+        if (new_velo < 0)
+          new_velo = 0;
+        if (new_velo > 4)
+          new_velo = 4;
+        seq_set_velocity(edit_step, (uint8_t)new_velo);
+        ui_show_edit_note(edit_step, seq_get_note(edit_step), (uint8_t)new_velo,
+                          true);
 
       } else if (edit_mode == PATTERN_SELECT) {
         int new_slot = (int)temp_pattern_slot + encoder_delta;
@@ -257,13 +285,15 @@ int main() {
       }
     }
 
-    if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE) {
+    if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE ||
+        edit_mode == EDIT_VELOCITY) {
       if (io_poll_step_button()) {
         seq_toggle_gate(edit_step);
-        if (edit_mode == EDIT_SELECT_STEP) {
+        if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_VELOCITY) {
           ui_show_edit_step(edit_step, seq_get_note(edit_step));
         } else {
-          ui_show_edit_note(edit_step, seq_get_note(edit_step));
+          ui_show_edit_note(edit_step, seq_get_note(edit_step),
+                            seq_get_velocity(edit_step));
         }
       }
       if (io_poll_save_button()) {

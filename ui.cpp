@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <cstring>
 
+static const char *velo_names[] = {"pp", "p", "mf", "f", "ff"};
+
 static const int SDA_PIN = 4;
 static const int SCL_PIN = 5;
 static const uint8_t SSD1306_ADDR = 0x3C;
@@ -20,6 +22,7 @@ static uint32_t ui_edit_step_prev_gate = 0xFFFFFFFF;
 static uint8_t ui_edit_note_prev_note = 255;
 static bool ui_edit_note_prev_gate = false;
 static uint32_t ui_edit_note_prev_step = 255;
+static uint8_t ui_edit_note_prev_velocity = 255;
 static int8_t ui_pattern_select_prev_slot = -1;
 
 static void fill_rect(int x0, int y0, int w, int h);
@@ -713,7 +716,9 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   char buf[32];
   char note_str[8];
   note_to_string(note, note_str);
-  sprintf(buf, "%02d %s", selected_step + 1, note_str);
+  uint8_t velo_idx = seq_get_velocity(selected_step);
+  sprintf(buf, "%02d %s [%s]", selected_step + 1, note_str,
+          velo_names[velo_idx > 4 ? 4 : velo_idx]);
   ui_draw_text(0, 2, buf);
 
   if (!first_draw || page_changed) {
@@ -724,45 +729,76 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   ssd1306_update();
 }
 
-void ui_show_edit_note(uint32_t step, uint8_t note) {
+static uint8_t ui_edit_note_prev_mode = 255; // 0=note, 1=velo
+
+void ui_show_edit_note(uint32_t step, uint8_t note, uint8_t velocity,
+                       bool edit_velocity) {
   bool gate_on = seq_get_gate_enabled(step);
+  uint8_t current_mode = edit_velocity ? 1 : 0;
   bool first_draw = (ui_edit_note_prev_note == 255);
+  bool mode_changed = (ui_edit_note_prev_mode != current_mode);
 
   if (first_draw) {
     ssd1306_clear_fb();
-    ui_draw_text(0, 0, "NOTE EDIT");
+    ui_draw_text(0, 0, "STEP EDIT");
   }
 
-  if (first_draw || ui_edit_note_prev_step != step) {
-    clear_region(0, 16, 128, 8);
+  // Header: Step and Gate
+  if (first_draw || ui_edit_note_prev_step != step ||
+      ui_edit_note_prev_gate != gate_on) {
+    clear_region(0, 14, 128, 10);
     char buf[32];
-    sprintf(buf, "Step: %02d", step + 1);
+    sprintf(buf, "ST:%02d | GT:%s", step + 1, gate_on ? "ON" : "OFF");
     ui_draw_text(0, 2, buf);
   }
 
-  if (first_draw || ui_edit_note_prev_gate != gate_on) {
-    clear_region(0, 32, 128, 8);
-    char buf[32];
-    sprintf(buf, "Gate: %s", gate_on ? "ON" : "OFF");
-    ui_draw_text(0, 4, buf);
-  }
-
-  if (first_draw || ui_edit_note_prev_note != note) {
-    clear_region(0, 40, 128, 24);
+  // Center: Note (Inverted if editing note)
+  if (first_draw || ui_edit_note_prev_note != note || mode_changed) {
+    clear_region(0, 30, 128, 20);
     char buf[32];
     char note_str[8];
     note_to_string(note, note_str);
     sprintf(buf, ">> %s <<", note_str);
 
-    int text_width = strlen(buf) * 6 * 2;
-    int center_x = (128 - text_width) / 2;
-    draw_scaled_text(center_x, 47, buf, 2);
+    int tx = (128 - (strlen(buf) * (5 * 2 + 2))) / 2;
+    draw_scaled_text(tx, 32, buf, 2);
+  }
+
+  // Bottom: Velocity label (Inverted if editing velocity)
+  if (first_draw || ui_edit_note_prev_velocity != velocity || mode_changed) {
+    clear_region(0, 54, 128, 10);
+    char label[16];
+    sprintf(label, "VELO:");
+    char velo_val[8];
+    sprintf(velo_val, "%s", velo_names[velocity > 4 ? 4 : velocity]);
+
+    if (edit_velocity) {
+      ui_draw_text_inverted(0, 7, label);
+      ui_draw_text(30, 7, velo_val);
+    } else {
+      ui_draw_text(0, 7, label);
+      ui_draw_text(30, 7, velo_val);
+    }
   }
 
   ui_edit_note_prev_note = note;
   ui_edit_note_prev_gate = gate_on;
   ui_edit_note_prev_step = step;
+  ui_edit_note_prev_velocity = velocity;
+  ui_edit_note_prev_mode = current_mode;
 
+  ssd1306_update();
+}
+
+void ui_show_velocity_hud(uint8_t velocity) {
+  // HUD at Page 1 (between header and info) to avoid grid/note clashes
+  int x0 = 0, y0 = 10, w = 128, h = 8;
+  clear_region(x0, y0, w, h);
+  char buf[32];
+  sprintf(buf, "VELO: %s", velo_names[velocity > 4 ? 4 : velocity]);
+  // Center the text
+  int tx = (128 - (strlen(buf) * 6)) / 2;
+  ui_draw_text(tx, 1, buf);
   ssd1306_update();
 }
 

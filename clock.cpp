@@ -29,6 +29,9 @@ volatile bool step_advanced_flag = false;
 constexpr uint8_t MIDI_BASE = 36;
 constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
 
+// Nuance values for Velocity (pp, p, mf, f, ff) - DAC values for 2x gain (0-4V)
+static const uint16_t velocity_map[5] = {800, 1600, 2400, 3200, 4095};
+
 void handle_tick() {
   tick_flag = true;
 
@@ -47,13 +50,25 @@ void handle_tick() {
         if (dac_val > 0x0FFF)
           dac_val = 0x0FFF;
 
-        // Set CV immediately
+        // Set CV immediately (Channel A)
         uint32_t save = save_and_disable_interrupts();
-        uint16_t command = 0x1000 | (dac_val & 0x0FFF);
-        uint8_t buf[2] = {(uint8_t)(command >> 8), (uint8_t)(command & 0xFF)};
+        uint16_t command_a = 0x1000 | (dac_val & 0x0FFF);
+        uint8_t buf_a[2] = {(uint8_t)(command_a >> 8),
+                            (uint8_t)(command_a & 0xFF)};
         gpio_put(17, false); // DAC_CS_PIN
-        spi_write_blocking(spi0, buf, 2);
+        spi_write_blocking(spi0, buf_a, 2);
         gpio_put(17, true);
+
+        // Set Velocity (Channel B) - 0x9000 for 2x gain
+        uint8_t velo_idx = seq_get_velocity(step);
+        uint16_t velo_dac = velocity_map[velo_idx > 4 ? 4 : velo_idx];
+        uint16_t command_b = 0x9000 | (velo_dac & 0x0FFF);
+        uint8_t buf_b[2] = {(uint8_t)(command_b >> 8),
+                            (uint8_t)(command_b & 0xFF)};
+        gpio_put(17, false); // DAC_CS_PIN
+        spi_write_blocking(spi0, buf_b, 2);
+        gpio_put(17, true);
+
         restore_interrupts(save);
 
         // Trigger Gate
