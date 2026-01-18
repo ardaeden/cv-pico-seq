@@ -18,6 +18,7 @@ static uint8_t fb[128 * 8];
 
 static int32_t ui_edit_step_prev_step = -1;
 static uint32_t ui_edit_step_prev_gate = 0xFFFFFFFF;
+static uint32_t ui_edit_step_prev_tie_mask = 0xFFFFFFFF;
 static uint8_t ui_edit_note_prev_note = 255;
 static bool ui_edit_note_prev_gate = false;
 static uint32_t ui_edit_note_prev_step = 255;
@@ -471,6 +472,26 @@ static void fill_rect(int x0, int y0, int w, int h) {
   }
 }
 
+static void draw_rect_custom(int x0, int y0, int w, int h, bool left,
+                             bool right, bool top, bool bottom) {
+  if (top) {
+    for (int x = x0; x < x0 + w; ++x)
+      set_pixel(x, y0);
+  }
+  if (bottom) {
+    for (int x = x0; x < x0 + w; ++x)
+      set_pixel(x, y0 + h - 1);
+  }
+  if (left) {
+    for (int y = y0; y < y0 + h; ++y)
+      set_pixel(x0, y);
+  }
+  if (right) {
+    for (int y = y0; y < y0 + h; ++y)
+      set_pixel(x0 + w - 1, y);
+  }
+}
+
 static void draw_rect_outline_dither(int x0, int y0, int w, int h) {
   for (int x = x0; x < x0 + w; ++x) {
     if ((x + y0) % 3 == 0)
@@ -536,12 +557,17 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
     bool is_active = (i < (int)steps);
     bool is_current = (i == (int)current_step);
     bool gate_enabled = seq_get_gate_enabled(i);
+    bool tied = seq_get_tie(i);
+    bool prev_tied = (i > 0 && (i % 8 != 0) && seq_get_tie(i - 1));
 
     if (is_active) {
+      bool draw_left = !prev_tied;
+      bool draw_right = !tied || (i % 8 == 7);
+
       if (is_current) {
         fill_rect(x, y, sq_w, sq_h);
       } else {
-        draw_rect_outline(x, y, sq_w, sq_h);
+        draw_rect_custom(x, y, sq_w, sq_h, draw_left, draw_right, true, true);
       }
 
       if (gate_enabled) {
@@ -549,6 +575,24 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
           clear_region(x + 5, y + 2, 3, 4);
         } else {
           fill_rect(x + 5, y + 2, 3, 4);
+        }
+      }
+
+      // Draw tie visual (hollow bridge)
+      if (tied && i < 31 && (i + 1) < (int)steps && (i % 8 != 7)) {
+        // Calculate next X to bridge any gap correctly (including group gap)
+        int next_col = (i + 1) % cols;
+        int next_x = left + next_col * (sq_w + spacing_x);
+        if (next_col >= 4) {
+          next_x += (group_gap - spacing_x);
+        }
+
+        int bridge_x_start = x + sq_w - 1;
+        int bridge_x_end = next_x;
+
+        for (int bx = bridge_x_start + 1; bx < bridge_x_end; ++bx) {
+          set_pixel(bx, y);
+          set_pixel(bx, y + sq_h - 1);
         }
       }
     } else {
@@ -579,6 +623,99 @@ static void note_to_string(uint8_t note, char *buf) {
   int octave = (note / 12) - 1; // MIDI: C-1=0, C0=12, C1=24, C2=36, C3=48, etc.
   int semitone = note % 12;
   sprintf(buf, "%s%d", notes[semitone], octave);
+}
+
+static void ui_draw_edit_step_single(uint32_t global_idx, bool is_selected,
+                                     uint32_t selected_step,
+                                     uint32_t total_steps, int x, int next_x,
+                                     int step_y, int sq, int spacing) {
+  bool is_active = (global_idx < total_steps);
+  bool gate_enabled = seq_get_gate_enabled(global_idx);
+  bool tied = seq_get_tie(global_idx);
+  bool prev_tied =
+      (global_idx > 0 && (global_idx % 8 != 0) && seq_get_tie(global_idx - 1));
+  bool next_selected = (global_idx + 1 == selected_step);
+
+  if (is_active) {
+    bool draw_left = !prev_tied;
+    bool draw_right = !tied || (global_idx % 8 == 7);
+
+    if (is_selected) {
+      draw_rect_custom(x, step_y, sq, sq, draw_left, draw_right, true, true);
+      if (gate_enabled) {
+        fill_rect(x + 3, step_y + 3, 7, 7);
+      }
+    } else {
+      draw_rect_custom(x + 2, step_y + 2, sq - 4, sq - 4, draw_left, draw_right,
+                       true, true);
+      if (gate_enabled) {
+        fill_rect(x + 4, step_y + 4, 5, 5);
+      }
+    }
+
+    // Bridge gaps for ties in edit view (hollow bridge/funnel)
+    if (tied && global_idx < 31 && (global_idx + 1) < total_steps &&
+        (global_idx % 8 != 7)) {
+
+      // Calculate pixel-perfect start/end X based on current and next box
+      // boundaries
+      int bridge_x_start = is_selected ? (x + sq - 1) : (x + sq - 3);
+      int bridge_x_end = next_selected ? next_x : (next_x + 2);
+
+      // Determine bridge Y boundaries
+      int current_y_top = is_selected ? step_y : step_y + 2;
+      int current_y_bot = is_selected ? step_y + sq - 1 : step_y + sq - 3;
+      int next_y_top = next_selected ? step_y : step_y + 2;
+      int next_y_bot = next_selected ? step_y + sq - 1 : step_y + sq - 3;
+
+      int bridge_y_top =
+          (current_y_top > next_y_top) ? current_y_top : next_y_top;
+      int bridge_y_bot =
+          (current_y_bot < next_y_bot) ? current_y_bot : next_y_bot;
+
+      // Draw bridge lines - ensuring they touch the boundaries
+      for (int bx = bridge_x_start + 1; bx < bridge_x_end; ++bx) {
+        set_pixel(bx, bridge_y_top);
+        set_pixel(bx, bridge_y_bot);
+      }
+
+      // Funnel: vertical segments to close the larger box gap at the transition
+      // points We draw these at the exact boundary of the boxes
+
+      // Left side (current box is taller)
+      if (current_y_top < bridge_y_top) {
+        for (int vy = current_y_top; vy <= bridge_y_top; ++vy)
+          set_pixel(bridge_x_start, vy);
+      }
+      if (current_y_bot > bridge_y_bot) {
+        for (int vy = bridge_y_bot; vy <= current_y_bot; ++vy)
+          set_pixel(bridge_x_start, vy);
+      }
+
+      // Right side (next box is taller)
+      if (next_y_top < bridge_y_top) {
+        for (int vy = next_y_top; vy <= bridge_y_top; ++vy)
+          set_pixel(bridge_x_end, vy);
+      }
+      if (next_y_bot > bridge_y_bot) {
+        for (int vy = bridge_y_bot; vy <= next_y_bot; ++vy)
+          set_pixel(bridge_x_end, vy);
+      }
+    }
+  } else {
+    // Ghost steps
+    if (is_selected) {
+      draw_rect_outline_dither(x, step_y, sq, sq);
+      if (gate_enabled) {
+        fill_rect_dither(x + 3, step_y + 3, 7, 7);
+      }
+    } else {
+      draw_rect_outline_dither(x + 2, step_y + 2, sq - 4, sq - 4);
+      if (gate_enabled) {
+        fill_rect_dither(x + 4, step_y + 4, 5, 5);
+      }
+    }
+  }
 }
 
 void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
@@ -621,36 +758,10 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
       int row = i / cols;
       int x = get_step_x(col);
       int step_y = (row == 0) ? top_y : bottom_y;
-      bool is_selected = (global_idx == selected_step);
-      bool is_active = (global_idx < total_steps);
-      bool gate_enabled = seq_get_gate_enabled(global_idx);
-
-      if (is_active) {
-        if (is_selected) {
-          draw_rect_outline(x, step_y, sq, sq);
-          if (gate_enabled) {
-            fill_rect(x + 3, step_y + 3, 7, 7);
-          }
-        } else {
-          draw_rect_outline(x + 2, step_y + 2, sq - 4, sq - 4);
-          if (gate_enabled) {
-            fill_rect(x + 4, step_y + 4, 5, 5);
-          }
-        }
-      } else {
-        // Ghost steps
-        if (is_selected) {
-          draw_rect_outline_dither(x, step_y, sq, sq);
-          if (gate_enabled) {
-            fill_rect_dither(x + 3, step_y + 3, 7, 7);
-          }
-        } else {
-          draw_rect_outline_dither(x + 2, step_y + 2, sq - 4, sq - 4);
-          if (gate_enabled) {
-            fill_rect_dither(x + 4, step_y + 4, 5, 5);
-          }
-        }
-      }
+      int next_x = get_step_x(col + 1);
+      ui_draw_edit_step_single(global_idx, global_idx == selected_step,
+                               selected_step, total_steps, x, next_x, step_y,
+                               sq, spacing);
     }
   } else {
     clear_region(0, 16, 128, 8);
@@ -659,7 +770,7 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
     uint32_t total_steps = seq_get_steps();
 
     if (ui_edit_step_prev_step != (int32_t)selected_step) {
-      // Clear old selected step visual (on current page)
+      // 1. Redraw old selected step as non-selected
       int old_local_idx = ui_edit_step_prev_step % 16;
       uint32_t old_global_idx = (uint32_t)ui_edit_step_prev_step;
       int old_col = old_local_idx % cols;
@@ -667,74 +778,68 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
       int old_x = get_step_x(old_col);
       int old_y = (old_row == 0) ? top_y : bottom_y;
       clear_region(old_x, old_y, sq, sq);
-      bool old_gate = seq_get_gate_enabled(old_global_idx);
-      bool old_active = (old_global_idx < total_steps);
+      int old_next_x = get_step_x(old_local_idx + 1);
+      ui_draw_edit_step_single(old_global_idx, false, selected_step,
+                               total_steps, old_x, old_next_x, old_y, sq,
+                               spacing);
 
-      if (old_active) {
-        draw_rect_outline(old_x + 2, old_y + 2, sq - 4, sq - 4);
-        if (old_gate) {
-          fill_rect(old_x + 4, old_y + 4, 5, 5);
-        }
-      } else {
-        draw_rect_outline_dither(old_x + 2, old_y + 2, sq - 4, sq - 4);
-        if (old_gate) {
-          fill_rect_dither(old_x + 4, old_y + 4, 5, 5);
-        }
+      // If old was tied or prev was tied, we might need to redraw neighbors
+      if (old_local_idx > 0 && seq_get_tie(old_global_idx - 1)) {
+        int prev_x = get_step_x(old_local_idx - 1);
+        ui_draw_edit_step_single(old_global_idx - 1, false, selected_step,
+                                 total_steps, prev_x, old_x, old_y, sq,
+                                 spacing);
       }
 
-      // Draw new selected step visual
+      // 2. Redraw new selected step
       int new_local_idx = selected_step % 16;
       int new_col = new_local_idx % cols;
       int new_row = new_local_idx / cols;
       int new_x = get_step_x(new_col);
       int new_y = (new_row == 0) ? top_y : bottom_y;
       clear_region(new_x, new_y, sq, sq);
-      bool new_gate = seq_get_gate_enabled(selected_step);
-      bool new_active = (selected_step < total_steps);
+      int new_next_x = get_step_x(new_local_idx + 1);
+      ui_draw_edit_step_single(selected_step, true, selected_step, total_steps,
+                               new_x, new_next_x, new_y, sq, spacing);
 
-      if (new_active) {
-        draw_rect_outline(new_x, new_y, sq, sq);
-        if (new_gate) {
-          fill_rect(new_x + 3, new_y + 3, 7, 7);
-        }
-      } else {
-        draw_rect_outline_dither(new_x, new_y, sq, sq);
-        if (new_gate) {
-          fill_rect_dither(new_x + 3, new_y + 3, 7, 7);
-        }
+      // If new is tied or prev is tied, redraw neighbors
+      if (new_local_idx > 0 && seq_get_tie(selected_step - 1)) {
+        int prev_x = get_step_x(new_local_idx - 1);
+        ui_draw_edit_step_single(selected_step - 1, false, selected_step,
+                                 total_steps, prev_x, new_x, new_y, sq,
+                                 spacing);
       }
-    } else if (current_gate_mask != ui_edit_step_prev_gate) {
+    } else if (current_gate_mask != ui_edit_step_prev_gate ||
+               seq_get_tie_mask() != ui_edit_step_prev_tie_mask) {
+      // Redraw selected step and its possible tie neighbors
       int local_idx = selected_step % 16;
       int col = local_idx % cols;
       int row = local_idx / cols;
       int x = get_step_x(col);
       int y = (row == 0) ? top_y : bottom_y;
       clear_region(x, y, sq, sq);
-      bool gate = seq_get_gate_enabled(selected_step);
-      bool active = (selected_step < total_steps);
+      int next_x = get_step_x(local_idx + 1);
+      ui_draw_edit_step_single(selected_step, true, selected_step, total_steps,
+                               x, next_x, y, sq, spacing);
 
-      if (active) {
-        draw_rect_outline(x, y, sq, sq);
-        if (gate) {
-          fill_rect(x + 3, y + 3, 7, 7);
-        }
-      } else {
-        draw_rect_outline_dither(x, y, sq, sq);
-        if (gate) {
-          fill_rect_dither(x + 3, y + 3, 7, 7);
-        }
+      if (local_idx > 0 && seq_get_tie(selected_step - 1)) {
+        int prev_x = get_step_x(local_idx - 1);
+        ui_draw_edit_step_single(selected_step - 1, false, selected_step,
+                                 total_steps, prev_x, x, y, sq, spacing);
       }
     }
 
     ui_edit_step_prev_gate = current_gate_mask;
+    ui_edit_step_prev_tie_mask = seq_get_tie_mask();
   }
 
   char buf[32];
   char note_str[8];
   note_to_string(note, note_str);
   uint8_t velo_idx = seq_get_velocity(selected_step);
-  sprintf(buf, "%02d %s [%s]", selected_step + 1, note_str,
-          velo_names[velo_idx > 4 ? 4 : velo_idx]);
+  bool tie = seq_get_tie(selected_step);
+  sprintf(buf, "%02d %s [%s]%s", selected_step + 1, note_str,
+          velo_names[velo_idx > 4 ? 4 : velo_idx], tie ? " TIE" : "");
   ui_draw_text(0, 2, buf);
 
   if (!first_draw || page_changed) {

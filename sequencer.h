@@ -30,6 +30,11 @@ bool seq_get_gate_enabled(uint32_t step);
 uint32_t seq_get_gate_mask();
 void seq_toggle_gate(uint32_t step);
 
+// Tie (Slur) operations
+bool seq_get_tie(uint32_t step);
+uint32_t seq_get_tie_mask();
+void seq_set_tie(uint32_t step, bool tie);
+
 // Velocity operations (0:pp, 1:p, 2:mf, 3:f, 4:ff)
 uint8_t seq_get_velocity(uint32_t step);
 void seq_set_velocity(uint32_t step, uint8_t velo_idx);

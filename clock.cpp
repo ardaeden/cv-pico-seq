@@ -78,6 +78,16 @@ void handle_tick() {
           gate_active = true;
           gate_start_us = time_us_64();
         }
+      } else {
+        // No gate active for this step
+        // IF the PREVIOUS step was NOT tied, we should ensure gate is low
+        // (This is a safety catch, usually timer_callback handles it)
+        uint32_t steps = seq_get_steps();
+        uint32_t prev_step = (step == 0) ? (steps - 1) : (step - 1);
+        if (!seq_get_tie(prev_step)) {
+          gpio_put(GATE_PIN, false);
+          gate_active = false;
+        }
       }
       step_advanced_flag = true;
     }
@@ -120,8 +130,12 @@ bool timer_callback(struct repeating_timer *t) {
   if (gate_active) {
     uint64_t now_us = time_us_64();
     if ((now_us - gate_start_us) >= gate_duration_us) {
-      gpio_put(GATE_PIN, false);
-      gate_active = false;
+      // ONLY pull gate low if current step is NOT tied
+      uint32_t current_step = seq_current_step();
+      if (!seq_get_tie(current_step)) {
+        gpio_put(GATE_PIN, false);
+        gate_active = false;
+      }
     }
   }
 

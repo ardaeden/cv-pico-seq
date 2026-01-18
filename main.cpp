@@ -4,6 +4,7 @@
 #include "io.h"
 #include "sequencer.h"
 #include "ui.h"
+#include <cstdio>
 
 int main() {
   stdio_init_all();
@@ -26,9 +27,6 @@ int main() {
               encoder_step == 10);
   ui_show_steps(seq_get_steps(), seq_get_steps());
 
-  constexpr uint8_t MIDI_BASE = 36;
-  constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
-
   // Output handling moved to Core 1
 
   enum EditMode {
@@ -49,15 +47,21 @@ int main() {
   uint64_t blink_start_time = 0;
   uint8_t blink_slot = 0;
 
+  // Interaction tracking for Step Button modifier logic
+  bool step_button_down = false;
+  uint64_t step_button_press_start_us = 0;
+  bool step_button_was_modified = false;
+
   while (true) {
     io_update_led();
 
     if (blink_active) {
       uint64_t elapsed = time_us_64() - blink_start_time;
       if (elapsed >= 150000) {
-        clear_region(48, 16, 32, 32);
-        char slot_char = '0' + blink_slot;
-        draw_scaled_char(56, 24, slot_char, 3);
+        clear_region(40, 16, 48, 32);
+        char slot_str[4];
+        sprintf(slot_str, "%02d", blink_slot);
+        draw_scaled_text(40, 24, slot_str, 3);
         ssd1306_update();
         blink_active = false;
       }
@@ -215,13 +219,27 @@ int main() {
     int encoder_delta = io_encoder_poll_delta();
     if (encoder_delta != 0) {
       if (edit_mode == EDIT_SELECT_STEP) {
-        int new_step = (int)edit_step + encoder_delta;
-        if (new_step < 0)
-          new_step = 0;
-        if (new_step > 31)
-          new_step = 31;
-        edit_step = (uint32_t)new_step;
-        ui_show_edit_step(edit_step, seq_get_note(edit_step));
+        if (io_is_step_button_pressed()) {
+          // Backward tie prevention: Only CW (encoder_delta > 0)
+          // creates/extends ties from the selected step.
+          if (encoder_delta > 0) {
+            bool current_tie = seq_get_tie(edit_step);
+            seq_set_tie(edit_step, !current_tie);
+            step_button_was_modified = true;
+          } else if (encoder_delta < 0) {
+            seq_set_tie(edit_step, false);
+            step_button_was_modified = true;
+          }
+          ui_show_edit_step(edit_step, seq_get_note(edit_step));
+        } else {
+          int new_step = (int)edit_step + encoder_delta;
+          if (new_step < 0)
+            new_step = 0;
+          if (new_step > 31)
+            new_step = 31;
+          edit_step = (uint32_t)new_step;
+          ui_show_edit_step(edit_step, seq_get_note(edit_step));
+        }
 
       } else if (edit_mode == EDIT_NOTE) {
         uint8_t current_note = seq_get_note(edit_step);
@@ -256,7 +274,7 @@ int main() {
 
       } else if (edit_mode == SETTINGS) {
         // Future: Change settings_option
-      } else {
+      } else if (edit_mode == EDIT_NONE) {
         if (io_is_step_button_pressed()) {
           uint32_t current_steps = seq_get_steps();
           int new_steps = (int)current_steps + encoder_delta;
@@ -265,8 +283,9 @@ int main() {
           if (new_steps > 32)
             new_steps = 32;
           seq_set_steps((uint32_t)new_steps);
-          ui_show_steps(seq_is_playing() ? seq_current_step() : 32,
+          ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
                         (uint32_t)new_steps);
+          step_button_was_modified = true;
         } else {
           if (clock_get_source() == CLOCK_INTERNAL) {
             uint32_t current_bpm = seq_get_bpm();
@@ -285,17 +304,41 @@ int main() {
       }
     }
 
-    if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE ||
-        edit_mode == EDIT_VELOCITY) {
-      if (io_poll_step_button()) {
-        seq_toggle_gate(edit_step);
-        if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_VELOCITY) {
-          ui_show_edit_step(edit_step, seq_get_note(edit_step));
-        } else {
-          ui_show_edit_note(edit_step, seq_get_note(edit_step),
-                            seq_get_velocity(edit_step));
+    // --- Interaction Refinement: Manually track Step Button for trigger on
+    // release ---
+    bool step_now = io_is_step_button_pressed();
+    if (step_now && !step_button_down) {
+      // Button Press
+      step_button_down = true;
+      step_button_press_start_us = time_us_64();
+      step_button_was_modified = false;
+    } else if (!step_now && step_button_down) {
+      // Button Release
+      uint64_t hold_duration = time_us_64() - step_button_press_start_us;
+      step_button_down = false;
+
+      // Only trigger if:
+      // 1. Not used as a modifier (for ties or step count)
+      // 2. Not a "long press" (held longer than 500ms) - strictly optional but
+      // good for UX
+      if (!step_button_was_modified && hold_duration < 500000) {
+        if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE ||
+            edit_mode == EDIT_VELOCITY) {
+          seq_toggle_gate(edit_step);
+          if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_VELOCITY) {
+            ui_show_edit_step(edit_step, seq_get_note(edit_step));
+          } else {
+            ui_show_edit_note(edit_step, seq_get_note(edit_step),
+                              seq_get_velocity(edit_step));
+          }
         }
       }
+    }
+
+    if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE ||
+        edit_mode == EDIT_VELOCITY) {
+      // REMOVED: io_poll_step_button() handler here since we use release logic
+      // above
       if (io_poll_save_button()) {
         edit_mode = SETTINGS;
         settings_option = 0;
@@ -309,7 +352,7 @@ int main() {
         }
         pattern_slot = temp_pattern_slot;
 
-        clear_region(48, 16, 32, 32);
+        clear_region(40, 16, 48, 32);
         ssd1306_update();
         blink_active = true;
         blink_start_time = time_us_64();

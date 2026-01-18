@@ -10,7 +10,7 @@ constexpr uint8_t EEPROM_BASE_ADDR = 0x50;
 constexpr uint SDA_PIN = 26;
 constexpr uint SCL_PIN = 27;
 constexpr uint8_t PATTERN_STORAGE_SIZE =
-    69;                              // 32 notes + 32 velo + 4 gate + 1 step
+    73; // 32 notes + 32 velo + 4 gate + 4 tie + 1 step
 constexpr uint8_t NUM_PATTERNS = 25; // User requested 25 slots
 constexpr uint8_t MAGIC_BYTE = 0xAC;
 constexpr uint16_t MAGIC_ADDR = 2000; // Near the end of 2KB EEPROM
@@ -40,7 +40,7 @@ bool eeprom_is_initialized() { return initialized; }
 
 void eeprom_write_pattern(uint8_t slot, const uint8_t *notes,
                           const uint8_t *velocities, uint32_t gate_mask,
-                          uint8_t steps) {
+                          uint32_t tie_mask, uint8_t steps) {
   if (!initialized || slot >= NUM_PATTERNS)
     return;
 
@@ -80,8 +80,20 @@ void eeprom_write_pattern(uint8_t slot, const uint8_t *notes,
     gate_addr++;
   }
 
+  // Write tie mask (4 bytes)
+  uint16_t tie_addr = addr + 68;
+  for (int i = 0; i < 4; i++) {
+    uint8_t tie_i2c_addr = EEPROM_BASE_ADDR | ((tie_addr >> 8) & 0x7);
+    uint8_t tie_local_addr = tie_addr & 0xFF;
+    uint8_t shift = (3 - i) * 8;
+    uint8_t buf[2] = {tie_local_addr, (uint8_t)((tie_mask >> shift) & 0xFF)};
+    i2c_write_blocking(i2c1, tie_i2c_addr, buf, 2, false);
+    sleep_ms(5);
+    tie_addr++;
+  }
+
   // Write steps (1 byte)
-  uint16_t steps_addr = addr + 68;
+  uint16_t steps_addr = addr + 72;
   uint8_t steps_i2c_addr = EEPROM_BASE_ADDR | ((steps_addr >> 8) & 0x7);
   uint8_t steps_local_addr = steps_addr & 0xFF;
   uint8_t buf3[2] = {steps_local_addr, steps};
@@ -90,7 +102,8 @@ void eeprom_write_pattern(uint8_t slot, const uint8_t *notes,
 }
 
 void eeprom_read_pattern(uint8_t slot, uint8_t *notes, uint8_t *velocities,
-                         uint32_t *gate_mask, uint8_t *steps) {
+                         uint32_t *gate_mask, uint32_t *tie_mask,
+                         uint8_t *steps) {
   if (!initialized || slot >= NUM_PATTERNS)
     return;
 
@@ -132,8 +145,24 @@ void eeprom_read_pattern(uint8_t slot, uint8_t *notes, uint8_t *velocities,
   }
   *gate_mask = mask;
 
+  // Read tie mask
+  uint16_t tie_addr = addr + 68;
+  uint32_t t_mask = 0;
+  for (int i = 0; i < 4; i++) {
+    uint8_t tie_i2c_addr = EEPROM_BASE_ADDR | ((tie_addr >> 8) & 0x7);
+    uint8_t tie_local_addr = tie_addr & 0xFF;
+
+    uint8_t val = 0;
+    i2c_write_blocking(i2c1, tie_i2c_addr, &tie_local_addr, 1, true);
+    i2c_read_blocking(i2c1, tie_i2c_addr, &val, 1, false);
+
+    t_mask |= ((uint32_t)val << ((3 - i) * 8));
+    tie_addr++;
+  }
+  *tie_mask = t_mask;
+
   // Read steps
-  uint16_t steps_addr = addr + 68;
+  uint16_t steps_addr = addr + 72;
   uint8_t steps_i2c_addr = EEPROM_BASE_ADDR | ((steps_addr >> 8) & 0x7);
   uint8_t steps_local_addr = steps_addr & 0xFF;
   i2c_write_blocking(i2c1, steps_i2c_addr, &steps_local_addr, 1, true);

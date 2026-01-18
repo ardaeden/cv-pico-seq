@@ -37,6 +37,7 @@ uint64_t last_stop_button_event_us = 0;
 
 bool step_button_prev = true;
 uint64_t last_step_button_event_us = 0;
+bool step_button_state_debounced = false; // Add this
 
 bool encoder_sw_prev = true;
 uint64_t last_encoder_sw_event_us = 0;
@@ -158,7 +159,18 @@ bool io_poll_stop_button() {
   return false;
 }
 
-bool io_is_step_button_pressed() { return !gpio_get(STEP_BUTTON_PIN); }
+bool io_is_step_button_pressed() {
+  // Update the debounced state
+  bool button_now = gpio_get(STEP_BUTTON_PIN);
+  uint64_t now_us = time_us_64();
+  if (button_now != step_button_prev &&
+      (now_us - last_step_button_event_us) >= DEBOUNCE_US) {
+    step_button_prev = button_now;
+    last_step_button_event_us = now_us;
+    step_button_state_debounced = !button_now;
+  }
+  return step_button_state_debounced;
+}
 
 bool io_poll_step_button() {
   bool button_now = gpio_get(STEP_BUTTON_PIN);
