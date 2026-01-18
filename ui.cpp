@@ -740,44 +740,69 @@ void ui_show_edit_note(uint32_t step, uint8_t note, uint8_t velocity,
 
   if (first_draw) {
     ssd1306_clear_fb();
-    ui_draw_text(0, 0, "STEP EDIT");
   }
 
-  // Header: Step and Gate
+  // Line 1: Step number (left) and Gate status (right)
   if (first_draw || ui_edit_note_prev_step != step ||
       ui_edit_note_prev_gate != gate_on) {
-    clear_region(0, 14, 128, 10);
-    char buf[32];
-    sprintf(buf, "ST:%02d | GT:%s", step + 1, gate_on ? "ON" : "OFF");
-    ui_draw_text(0, 2, buf);
+    clear_region(0, 10, 128, 20);
+    char step_buf[8];
+    sprintf(step_buf, "%02d", step + 1);
+    draw_scaled_text(0, 10, step_buf, 2);
+
+    char gate_buf[8];
+    sprintf(gate_buf, "%s", gate_on ? "ON" : "OFF");
+    int gate_x = 128 - (strlen(gate_buf) * (5 * 2 + 2));
+    draw_scaled_text(gate_x, 10, gate_buf, 2);
   }
 
-  // Center: Note (Inverted if editing note)
-  if (first_draw || ui_edit_note_prev_note != note || mode_changed) {
-    clear_region(0, 30, 128, 20);
-    char buf[32];
+  // Line 2: Note (left) and Velocity (right) - with inverted highlighting
+  if (first_draw || ui_edit_note_prev_note != note ||
+      ui_edit_note_prev_velocity != velocity || mode_changed) {
+    clear_region(0, 36, 128,
+                 22); // Increased to cover padding (14 + 2*2 + margin)
+
     char note_str[8];
     note_to_string(note, note_str);
-    sprintf(buf, ">> %s <<", note_str);
 
-    int tx = (128 - (strlen(buf) * (5 * 2 + 2))) / 2;
-    draw_scaled_text(tx, 32, buf, 2);
-  }
+    // Note on the left
+    draw_scaled_text(0, 38, note_str, 2);
+    if (!edit_velocity) {
+      // Invert after drawing with padding
+      int note_width = strlen(note_str) * 12;
+      int pad = 2; // padding in pixels
+      for (int cy = -pad; cy < 14 + pad; cy++) {
+        for (int cx = -pad; cx < note_width + pad; cx++) {
+          int px = 0 + cx;
+          int py = 38 + cy;
+          if (px >= 0 && px < 128 && py >= 0 && py < 64) {
+            int page = py >> 3;
+            int bit = py & 7;
+            fb[page * 128 + px] ^= (1u << bit);
+          }
+        }
+      }
+    }
 
-  // Bottom: Velocity label (Inverted if editing velocity)
-  if (first_draw || ui_edit_note_prev_velocity != velocity || mode_changed) {
-    clear_region(0, 54, 128, 10);
-    char label[16];
-    sprintf(label, "VELO:");
-    char velo_val[8];
-    sprintf(velo_val, "%s", velo_names[velocity > 4 ? 4 : velocity]);
-
+    // Velocity on the right
+    const char *velo_str = velo_names[velocity > 4 ? 4 : velocity];
+    int velo_x = 128 - (strlen(velo_str) * 12);
+    draw_scaled_text(velo_x, 38, velo_str, 2);
     if (edit_velocity) {
-      ui_draw_text_inverted(0, 7, label);
-      ui_draw_text(30, 7, velo_val);
-    } else {
-      ui_draw_text(0, 7, label);
-      ui_draw_text(30, 7, velo_val);
+      // Invert after drawing with padding
+      int velo_width = strlen(velo_str) * 12;
+      int pad = 2; // padding in pixels
+      for (int cy = -pad; cy < 14 + pad; cy++) {
+        for (int cx = -pad; cx < velo_width + pad; cx++) {
+          int px = velo_x + cx;
+          int py = 38 + cy;
+          if (px >= 0 && px < 128 && py >= 0 && py < 64) {
+            int page = py >> 3;
+            int bit = py & 7;
+            fb[page * 128 + px] ^= (1u << bit);
+          }
+        }
+      }
     }
   }
 
