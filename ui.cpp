@@ -71,7 +71,10 @@ static const uint8_t font5x7[][5] = {
     {0x08, 0x14, 0x22, 0x41, 0x00},                                 // 41: <
     {0x20, 0x54, 0x54, 0x54, 0x38},                                 // 42: a
     {0x7C, 0x04, 0x04, 0x04, 0x78},                                 // 43: n
-    {0x38, 0x44, 0x44, 0x44, 0x38}                                  // 44: o
+    {0x38, 0x44, 0x44, 0x44, 0x38},                                 // 44: o
+    {0x7C, 0x14, 0x14, 0x14, 0x08},                                 // 45: p
+    {0x7C, 0x04, 0x18, 0x04, 0x78},                                 // 46: m
+    {0x08, 0x7E, 0x09, 0x01, 0x02}                                  // 47: f
 };
 
 static int char_to_font_index(char c) {
@@ -89,6 +92,12 @@ static int char_to_font_index(char c) {
     return 43;
   if (c == 'o')
     return 44;
+  if (c == 'p')
+    return 45;
+  if (c == 'm')
+    return 46;
+  if (c == 'f')
+    return 47;
   if (c >= 'b' && c <= 'z') // Fallback for other lowercase
     return 12 + (c - 'a');
   if (c == '#')
