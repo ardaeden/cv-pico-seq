@@ -248,9 +248,9 @@ int main() {
       } else if (edit_mode == PATTERN_SELECT) {
         int new_slot = (int)temp_pattern_slot + encoder_delta;
         if (new_slot < 0)
+          new_slot = 24;
+        if (new_slot > 24)
           new_slot = 0;
-        if (new_slot > 9)
-          new_slot = 9;
         temp_pattern_slot = (uint8_t)new_slot;
         ui_show_pattern_select(temp_pattern_slot);
 

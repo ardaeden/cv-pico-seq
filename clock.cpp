@@ -29,8 +29,9 @@ volatile bool step_advanced_flag = false;
 constexpr uint8_t MIDI_BASE = 36;
 constexpr float DAC_PER_SEMITONE = 4096.0f / 48.0f;
 
-// Nuance values for Velocity (pp, p, mf, f, ff) - DAC values for 2x gain (0-4V)
-static const uint16_t velocity_map[5] = {800, 1600, 2400, 3200, 4095};
+// Nuance values for Velocity (pp, p, mf, f, ff) - Expanded range for better
+// contrast
+static const uint16_t velocity_map[5] = {500, 1000, 2400, 3600, 4095};
 
 void handle_tick() {
   tick_flag = true;

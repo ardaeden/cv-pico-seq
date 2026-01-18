@@ -10,10 +10,10 @@ constexpr uint8_t EEPROM_BASE_ADDR = 0x50;
 constexpr uint SDA_PIN = 26;
 constexpr uint SCL_PIN = 27;
 constexpr uint8_t PATTERN_STORAGE_SIZE =
-    69; // 32 notes + 32 velo + 4 gate + 1 step
-constexpr uint8_t NUM_PATTERNS = 10;
+    69;                              // 32 notes + 32 velo + 4 gate + 1 step
+constexpr uint8_t NUM_PATTERNS = 25; // User requested 25 slots
 constexpr uint8_t MAGIC_BYTE = 0xAC;
-constexpr uint16_t MAGIC_ADDR = 1900;
+constexpr uint16_t MAGIC_ADDR = 2000; // Near the end of 2KB EEPROM
 
 bool initialized = false;
 } // namespace
@@ -46,6 +46,7 @@ void eeprom_write_pattern(uint8_t slot, const uint8_t *notes,
 
   uint16_t addr = slot * PATTERN_STORAGE_SIZE;
 
+  // Write notes (32 bytes)
   for (int i = 0; i < 32; i++) {
     uint16_t byte_addr = addr + i;
     uint8_t i2c_addr = EEPROM_BASE_ADDR | ((byte_addr >> 8) & 0x7);
@@ -67,6 +68,7 @@ void eeprom_write_pattern(uint8_t slot, const uint8_t *notes,
     sleep_ms(5);
   }
 
+  // Write gate mask (4 bytes)
   uint16_t gate_addr = addr + 64;
   for (int i = 0; i < 4; i++) {
     uint8_t gate_i2c_addr = EEPROM_BASE_ADDR | ((gate_addr >> 8) & 0x7);
@@ -78,6 +80,7 @@ void eeprom_write_pattern(uint8_t slot, const uint8_t *notes,
     gate_addr++;
   }
 
+  // Write steps (1 byte)
   uint16_t steps_addr = addr + 68;
   uint8_t steps_i2c_addr = EEPROM_BASE_ADDR | ((steps_addr >> 8) & 0x7);
   uint8_t steps_local_addr = steps_addr & 0xFF;
@@ -93,7 +96,7 @@ void eeprom_read_pattern(uint8_t slot, uint8_t *notes, uint8_t *velocities,
 
   uint16_t addr = slot * PATTERN_STORAGE_SIZE;
 
-  // Read notes byte-by-byte to handle block boundaries and ensure consistency
+  // Read notes
   for (int i = 0; i < 32; i++) {
     uint16_t byte_addr = addr + i;
     uint8_t i2c_addr = EEPROM_BASE_ADDR | ((byte_addr >> 8) & 0x7);
@@ -113,7 +116,7 @@ void eeprom_read_pattern(uint8_t slot, uint8_t *notes, uint8_t *velocities,
     i2c_read_blocking(i2c1, i2c_addr, &velocities[i], 1, false);
   }
 
-  // Read gate mask byte-by-byte
+  // Read gate mask
   uint16_t gate_addr = addr + 64;
   uint32_t mask = 0;
   for (int i = 0; i < 4; i++) {

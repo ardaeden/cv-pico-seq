@@ -846,9 +846,10 @@ void ui_show_pattern_select(uint8_t slot) {
   }
 
   if (first_draw || ui_pattern_select_prev_slot != (int8_t)slot) {
-    clear_region(48, 16, 32, 32);
-    char slot_char = '0' + slot;
-    draw_scaled_char(56, 24, slot_char, 3);
+    clear_region(40, 16, 48, 32);
+    char slot_str[4];
+    sprintf(slot_str, "%02d", slot);
+    draw_scaled_text(40, 24, slot_str, 3);
   }
 
   ui_pattern_select_prev_slot = slot;
