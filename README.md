@@ -9,17 +9,19 @@ The **CV Pico Sequencer** transforms a standard Raspberry Pi Pico into a capable
 ## ✨ Features
 
 ### Core Sequencing
-- **16-Step Sequencer:** Fully configurable step count per pattern (1 to 16 steps).
+- **32-Step Sequencer:** Fully configurable step count per pattern (1 to 32 steps).
 - **Precision Timing:** BPM range from 20 to 300, driven by a dedicated hardware timer on Core 1 for jitter-free clocking.
-- **CV/Gate Output:**
-  - **CV:** 1V/Octave standard (0-4095 DAC resolution), covering a wide musical range (MIDI notes 36-84).
-  - **Gate:** 3.3V digital output (GP6) with configurable duration (50% duty cycle).
+- **CV/Gate/Velocity Output:**
+  - **Note CV (DAC A):** 1V/Octave standard (0-4095 resolution), MIDI notes 36-84.
+  - **Velocity CV (DAC B):** Proportional dynamic output:
+    - `pp`: 0.50V | `p`: 1.00V | `mf`: 2.40V | `f`: 3.60V | `ff`: 4.09V
+  - **Gate:** 3.3V digital output (GP6) with configurable duration.
 - **Clock Output:** Dedicated 24 PPQN clock output (GP22) for syncing external gear.
 
 ### Pattern Management
-- **10 Pattern Slots:** Store and recall up to 10 unique patterns (Slots 0-9).
-- **Non-Volatile Storage:** Patterns are saved to the onboard flash memory/EEPROM, persisting across power cycles.
-- **Performance Queuing:** Switch patterns seamlessly during playback. The next pattern queues and launches perfectly in sync at the end of the current cycle (BPM display blinks when a pattern is queued).
+- **25 Pattern Slots:** Store and recall up to 25 unique patterns (Slots 00-24).
+- **EEPROM Storage:** Patterns are saved to an external I2C EEPROM (e.g., 24LC16), persisting across power cycles.
+- **Performance Queuing:** Switch patterns seamlessly during playback. The next pattern queues and launches perfectly in sync at the end of the current cycle.
 - **Auto-Flush:** Changes are automatically flushed to non-volatile storage when sequence is stopped or paused.
 
 ### User Interface
@@ -58,7 +60,9 @@ The system is built around the **Raspberry Pi Pico**.
 | **Pattern Select**| GP11     | Input  | Enter Pattern Select / Queue Mode |
 | **Save / Set**    | GP12     | Input  | Enter Settings / Save pattern (in Select mode) |
 | **Ext Clock In**  | GP21     | Input  | External Clock Input (Active-LOW) |
-| **Encoder SW**    | GP13     | Input  | Confirm / Toggle Note Edit / BPM Step (1x/10x) |
+| **I2C SDA**       | GP26     | I/O    | EEPROM Data (SDA) |
+| **I2C SCL**       | GP27     | Output | EEPROM Clock (SCL) |
+| **Encoder SW**    | GP13     | Input  | Confirm / BPM Step (1x/10x) |
 | **Encoder CLK**   | GP14     | Input  | Rotary Encoder Clock |
 | **Encoder DT**    | GP15     | Input  | Rotary Encoder Data |
 | **DAC CS**        | GP17     | Output | SPI Chip Select for MCP4822 |
@@ -77,8 +81,8 @@ The system is built around the **Raspberry Pi Pico**.
 | **Edit Mode (GP10)** | Enter Step Edit Mode | Exit to Main Screen | Enter Step Edit Mode |
 | **Pattern Select (GP11)**| Enter Pattern Select Mode | Enter Pattern Select Mode | Exit to Main Screen |
 | **Save / Set (GP12)** | Enter Settings Mode | Enter Settings Mode | **Press**: Save to Slot |
-| **Encoder (Rotate)** | Adjust BPM | Select Step / Adjust Pitch | Select Pattern Slot (0-9) |
-| **Encoder (Press)** | Toggle BPM Step (1x / 10x) | Toggle Step vs. Note Edit | Load / Queue Pattern |
+| **Encoder (Rotate)** | Adjust BPM | Select Step / Adjust Value | Select Pattern Slot (00-24) |
+| **Encoder (Press)** | Toggle BPM Step (1x / 10x) | Toggle Note vs. Velocity Edit | Load / Queue Pattern |
 
 #### ⚙️ Settings Mode (via GP12)
 | Action | Function |
@@ -99,7 +103,20 @@ The codebase is modular, written in **C++17**, and structured for maintainabilit
 - **`clock.cpp / .h`**: High-precision timing engine managing BPM, ticks, and hardware outputs (Gate/Clock/CV) on Core 1.
 - **`ui.cpp / .h`**: Drawing routines for the SSD1306 OLED using a lightweight driver.
 - **`io.cpp / .h`**: Hardware abstraction layer for GPIO, debouncing, and Encoder interrupts.
-- **`eeprom.cpp / .h`**: Storage abstraction for saving/loading patterns to flash memory.
+- **`eeprom.cpp / .h`**: Storage abstraction for saving/loading patterns to external I2C EEPROM.
+
+### 💾 EEPROM Data Format
+Each pattern occupies **69 bytes** in the EEPROM.
+
+| Offset | Size | Description |
+|:---|:---|:---|
+| 0 | 32 B | MIDI Notes (0-127) |
+| 32 | 32 B | Velocity Levels (0-4: pp, p, mf, f, ff) |
+| 64 | 4 B | Gate Mask (32-bit bitfield) |
+| 68 | 1 B | Active Step Count (1-32) |
+
+- **Total Capacity:** 25 Patterns (approx 1.7 KB consumed).
+- **Initialization:** Magic Byte `0xAC` is stored at address `2000` to verify data validity.
 
 ### Key Libraries
 - **Pico SDK:** `pico_stdlib`, `pico_multicore`, `hardware_timer`, `hardware_i2c`, `hardware_spi`, `hardware_flash`.
@@ -173,7 +190,7 @@ Displays the current **BPM** (Tempo), **Pattern Slot**, and the **32-Step Grid**
 ### Pattern Management
 1.  **Select/Load Pattern:**
     - Press **Pattern Select (GP11)**.
-    - Rotate Encoder to choose a slot (0-9).
+    - Rotate Encoder to choose a slot (**00-24**).
     - **Press Encoder Button** to Load.
       - *If playing:* The pattern is **Queued** (BPM display blinks) and will load automatically at the end of the current pattern cycle.
       - *If stopped:* Loads immediately.
@@ -181,7 +198,7 @@ Displays the current **BPM** (Tempo), **Pattern Slot**, and the **32-Step Grid**
 2.  **Save Pattern:**
     - In "Pattern Select" mode, choose your target slot.
     - Press **Save (GP12)**.
-    - The screen will show a large digit of the slot number to confirm the save.
+    - The screen will show a large 2-digit confirmation of the slot number.
 
 ---
 
