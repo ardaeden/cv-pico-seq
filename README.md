@@ -15,7 +15,7 @@ The **CV Pico Sequencer** transforms a standard Raspberry Pi Pico into a capable
   - **Note CV (DAC A):** 1V/Octave standard (0-4095 resolution), MIDI notes 36-84.
   - **Velocity CV (DAC B):** Proportional dynamic output:
     - `pp`: 0.50V | `p`: 1.00V | `mf`: 2.40V | `f`: 3.60V | `ff`: 4.09V
-  - **Gate:** 3.3V digital output (GP6) with configurable duration.
+  - **Gate:** 3.3V digital output (GP6) with configurable duration (10% to 90% of clock interval).
 - **Clock Output:** Dedicated 24 PPQN clock output (GP22) for syncing external gear.
 
 ### Pattern Management
@@ -87,7 +87,8 @@ The system is built around the **Raspberry Pi Pico**.
 #### ⚙️ Settings Mode (via GP12)
 | Action | Function |
 |:---|:---|
-| **Encoder Button** | Toggle Clock Source (**INTERNAL** / **EXTERNAL**) |
+| **Rotate Encoder** | Select setting (**CLOCK SOURCE** or **GATE LEN**) |
+| **Encoder Button** | **Clock:** Toggle Source (INT/EXT) <br> **Gate Len:** Enter Adjustment Mode (Value inverts when active) |
 | **Save Button** | Exit Settings |
 | **Stop Button** | Exit Settings |
 
@@ -194,6 +195,16 @@ Displays the current **BPM** (Tempo), **Pattern Slot**, and the **32-Step Grid**
     - **Press Encoder Button** to Load.
       - *If playing:* The pattern is **Queued** (BPM display blinks) and will load automatically at the end of the current pattern cycle.
       - *If stopped:* Loads immediately.
+
+### Settings & Configuration
+1.  **Enter Settings:** Press **Save (GP12)** from the main screen.
+2.  **Navigation:** Rotate encoder to highlight **CLOCK** or **GATE LEN**.
+3.  **Adjusting Clock Source:** Press encoder button while **CLOCK** is highlighted to toggle between **INTERNAL** and **EXTERNAL**.
+4.  **Adjusting Gate Length:**
+    - Highlight **GATE LEN** and press encoder button. The percentage value will be **inverted**.
+    - Rotate encoder to set length (**10% to 90%**).
+    - Press encoder button again to confirm.
+5.  **Exit:** Press **Save (GP12)** or **Stop (GP7)** to return to the main screen.
 
 2.  **Save Pattern:**
     - In "Pattern Select" mode, choose your target slot.
