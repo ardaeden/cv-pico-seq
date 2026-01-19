@@ -42,6 +42,8 @@ int main() {
   uint8_t pattern_slot = 0;
   uint8_t temp_pattern_slot = 0;
   int settings_option = 0;
+  bool settings_edit_mode = false;
+  const int NUM_SETTINGS = 2;
 
   bool blink_active = false;
   uint64_t blink_start_time = 0;
@@ -207,7 +209,12 @@ int main() {
           ClockSource current = clock_get_source();
           clock_set_source(current == CLOCK_INTERNAL ? CLOCK_EXTERNAL
                                                      : CLOCK_INTERNAL);
-          ui_show_settings(settings_option, clock_get_source());
+          ui_show_settings(settings_option, clock_get_source(),
+                           clock_get_gate_length(), settings_edit_mode);
+        } else if (settings_option == 1) {
+          settings_edit_mode = !settings_edit_mode;
+          ui_show_settings(settings_option, clock_get_source(),
+                           clock_get_gate_length(), settings_edit_mode);
         }
       } else if (edit_mode == EDIT_NONE) {
         encoder_step = (encoder_step == 1) ? 10 : 1;
@@ -273,7 +280,24 @@ int main() {
         ui_show_pattern_select(temp_pattern_slot);
 
       } else if (edit_mode == SETTINGS) {
-        // Future: Change settings_option
+        if (!settings_edit_mode) {
+          settings_option += encoder_delta;
+          if (settings_option < 0)
+            settings_option = NUM_SETTINGS - 1;
+          if (settings_option >= NUM_SETTINGS)
+            settings_option = 0;
+        } else {
+          if (settings_option == 1) { // Gate Length
+            int len = (int)clock_get_gate_length() + encoder_delta * 10;
+            if (len < 10)
+              len = 10;
+            if (len > 90)
+              len = 90;
+            clock_set_gate_length((uint8_t)len);
+          }
+        }
+        ui_show_settings(settings_option, clock_get_source(),
+                         clock_get_gate_length(), settings_edit_mode);
       } else if (edit_mode == EDIT_NONE) {
         if (io_is_step_button_pressed()) {
           uint32_t current_steps = seq_get_steps();
@@ -342,7 +366,9 @@ int main() {
       if (io_poll_save_button()) {
         edit_mode = SETTINGS;
         settings_option = 0;
-        ui_show_settings(settings_option, clock_get_source());
+        settings_edit_mode = false;
+        ui_show_settings(settings_option, clock_get_source(),
+                         clock_get_gate_length(), settings_edit_mode);
       }
     } else if (edit_mode == PATTERN_SELECT) {
       if (io_poll_save_button()) {
@@ -371,7 +397,9 @@ int main() {
       if (io_poll_save_button()) {
         edit_mode = SETTINGS;
         settings_option = 0;
-        ui_show_settings(settings_option, clock_get_source());
+        settings_edit_mode = false;
+        ui_show_settings(settings_option, clock_get_source(),
+                         clock_get_gate_length(), settings_edit_mode);
       }
     }
 

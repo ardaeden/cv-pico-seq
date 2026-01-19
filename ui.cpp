@@ -445,6 +445,28 @@ void clear_region(int x0, int y0, int w, int h) {
   }
 }
 
+static void invert_region(int x0, int y0, int w, int h) {
+  if (w <= 0 || h <= 0)
+    return;
+  int x1 = x0 + w - 1;
+  int y1 = y0 + h - 1;
+  if (x0 < 0)
+    x0 = 0;
+  if (y0 < 0)
+    y0 = 0;
+  if (x1 >= 128)
+    x1 = 127;
+  if (y1 >= 64)
+    y1 = 63;
+  for (int y = y0; y <= y1; ++y) {
+    int page = y >> 3;
+    int bit = y & 7;
+    for (int x = x0; x <= x1; ++x) {
+      fb[page * 128 + x] ^= (1u << bit);
+    }
+  }
+}
+
 // Helper: draw scaled text
 void draw_scaled_text(int x, int y, const char *text, int scale) {
   for (const char *p = text; *p; ++p) {
@@ -967,19 +989,34 @@ void ui_show_pattern_select(uint8_t slot) {
   ssd1306_update();
 }
 
-void ui_show_settings(int current_option, ClockSource clock_source) {
+void ui_show_settings(int current_option, ClockSource clock_source,
+                      uint8_t gate_length, bool edit_mode) {
   ssd1306_clear_fb();
   ui_draw_text(36, 0, "SETTINGS");
 
-  // For now we only have one option: CLOCK
   char buf[32];
-  sprintf(buf, "%sCLOCK:", (current_option == 0) ? ">> " : "   ");
-  ui_draw_text(0, 3, buf);
 
+  // Option 0: Clock
   const char *source_str =
       (clock_source == CLOCK_INTERNAL) ? "INTERNAL" : "EXTERNAL";
-  sprintf(buf, "   %s", source_str);
-  ui_draw_text(0, 5, buf);
+  sprintf(buf, "%sCLOCK: ", (current_option == 0) ? ">> " : "   ");
+  ui_draw_text(0, 2, buf);
+  int clock_val_x = strlen(buf) * 6;
+  ui_draw_text(clock_val_x, 2, source_str);
+  if (current_option == 0 && edit_mode) {
+    invert_region(clock_val_x - 1, 2 * 8 - 1, strlen(source_str) * 6, 9);
+  }
+
+  // Option 1: Gate Length
+  sprintf(buf, "%sGATE LEN: ", (current_option == 1) ? ">> " : "   ");
+  ui_draw_text(0, 4, buf);
+  char val_buf[8];
+  sprintf(val_buf, "%d%%", gate_length);
+  int gate_val_x = strlen(buf) * 6;
+  ui_draw_text(gate_val_x, 4, val_buf);
+  if (current_option == 1 && edit_mode) {
+    invert_region(gate_val_x - 1, 4 * 8 - 1, strlen(val_buf) * 6, 9);
+  }
 
   // Firmware Version (bottom-right)
   ui_draw_text(128 - (strlen(FIRMWARE_VERSION_STR) * 6), 7,

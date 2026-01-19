@@ -23,6 +23,7 @@ volatile uint64_t gate_duration_us = 2500;
 
 constexpr uint CLOCK_EXT_PIN = 21;
 volatile ClockSource current_source = CLOCK_INTERNAL;
+volatile uint8_t gate_length_percent = 50;
 
 volatile uint32_t internal_tick_count = 0;
 volatile bool step_advanced_flag = false;
@@ -179,9 +180,20 @@ bool clock_consume_step() {
 void clock_set_bpm(uint32_t bpm) {
   uint64_t us_per_quarter = 60000000ULL / (bpm ? bpm : 120);
   clock_interval_us = static_cast<uint32_t>(us_per_quarter / 24);
-  // 50% duty cycle for a 16th note (one step = 6 ticks, so 3 ticks)
-  gate_duration_us = clock_interval_us * 3;
+  // recalculate gate duration based on current gate length
+  gate_duration_us =
+      (uint64_t)clock_interval_us * 6 * gate_length_percent / 100;
 }
+
+void clock_set_gate_length(uint8_t percent) {
+  if (percent > 100)
+    percent = 100;
+  gate_length_percent = percent;
+  // recalculate with current clock_interval_us
+  gate_duration_us = (uint64_t)clock_interval_us * 6 * percent / 100;
+}
+
+uint8_t clock_get_gate_length() { return gate_length_percent; }
 
 void clock_init() {
   gpio_init(GATE_PIN);

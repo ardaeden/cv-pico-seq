@@ -8,6 +8,8 @@ enum ClockSource { CLOCK_INTERNAL, CLOCK_EXTERNAL };
 void clock_set_source(ClockSource source);
 ClockSource clock_get_source();
 void clock_set_bpm(uint32_t bpm);
+void clock_set_gate_length(uint8_t percent);
+uint8_t clock_get_gate_length();
 
 // Launch the timing core (core1) that generates ticks.
 void clock_init();
