@@ -15,7 +15,7 @@ The **CV Pico Sequencer** transforms a standard Raspberry Pi Pico into a capable
   - **Note CV (DAC A):** 1V/Octave standard (0-4095 resolution), MIDI notes 36-84.
   - **Velocity CV (DAC B):** Proportional dynamic output:
     - `pp`: 0.50V | `p`: 1.00V | `mf`: 2.40V | `f`: 3.60V | `ff`: 4.09V
-  - **Gate:** 3.3V digital output (GP6) with configurable duration (10% to 90% of clock interval).
+  - **Gate:** High-voltage output (GP6 via OpAmp, 10Vpp) with configurable duration (10% to 90% of clock interval).
 - **Clock Output:** Dedicated 24 PPQN clock output (GP22) for syncing external gear.
 
 ### Pattern Management
@@ -50,7 +50,7 @@ The system is built around the **Raspberry Pi Pico**.
 
 | Component         | GPIO Pin | Type   | Description |
 |-------------------|----------|--------|-------------|
-| **Gate Out**      | GP6      | Output | 3.3V Trigger/Gate Output |
+| **Gate Out**      | GP6      | Output | 10Vpp Trigger/Gate Output (OpAmp Buffered) |
 | **Clock Out**     | GP22     | Output | 24 PPQN Sync Clock |
 | **Status LED**    | GP3      | Output | Visual Beat Indicator |
 | **Play/Pause**    | GP2      | Input  | Toggles playback / Gate enable |
@@ -69,7 +69,7 @@ The system is built around the **Raspberry Pi Pico**.
 | **DAC SCK**       | GP18     | Output | SPI Clock |
 | **DAC TX (MOSI)** | GP19     | Output | SPI Data |
 
-> **Note:** For Eurorack integration, ensure proper voltage scaling/buffering. The Pico outputs 0-3.3V, while Eurorack typically expects 0-5V or 0-10V for CV and Gates.
+> **Note:** The Gate output is already buffered via an OpAmp to provide a **10Vpp** signal suitable for most Eurorack modules. For Note and Velocity CV outputs (DAC), the Pico provides a 0-3.3V range which is scaled to the standards mentioned in the features section.
 
 ### 🎮 Button Reference
 
