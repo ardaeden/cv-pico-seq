@@ -769,7 +769,7 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   if (first_draw || page_changed) {
     ssd1306_clear_fb();
     char header[32];
-    sprintf(header, "STEP EDIT P:%d", page + 1);
+    sprintf(header, "STEP EDIT  PAGE:%d", page + 1);
     ui_draw_text(0, 0, header);
 
     uint32_t total_steps = seq_get_steps();
@@ -860,8 +860,9 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   note_to_string(note, note_str);
   uint8_t velo_idx = seq_get_velocity(selected_step);
   bool tie = seq_get_tie(selected_step);
-  sprintf(buf, "%02d %s [%s]%s", selected_step + 1, note_str,
-          velo_names[velo_idx > 4 ? 4 : velo_idx], tie ? " TIE" : "");
+  const char *v_str = velo_names[velo_idx > 4 ? 4 : velo_idx];
+  sprintf(buf, "%02d %s %s %s", selected_step + 1, note_str, v_str,
+          tie ? "TIE" : "");
   ui_draw_text(0, 2, buf);
 
   if (!first_draw || page_changed) {
