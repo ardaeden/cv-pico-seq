@@ -121,20 +121,24 @@ void external_clock_callback(uint gpio, uint32_t events) {
 bool timer_callback(struct repeating_timer *t) {
   us_counter += 100;
 
+  // Simultaneous Trigger logic (Absolute Phase Alignment)
   if (current_source == CLOCK_INTERNAL && us_counter >= clock_interval_us) {
     us_counter = 0;
+
+    // Master sends pulse to slaves (Falling Edge triggers both NOW)
+    if (clock_out_enabled) {
+      gpio_put(CLOCK_OUT_PIN, false); // Active LOW: Pulse starts
+      clock_pin_state = true;
+    }
+
     handle_tick();
   }
 
-  // Restore c54ac49 Midway-Falling-Edge logic (Rock-solid sync)
-  if (current_source == CLOCK_INTERNAL && clock_out_enabled) {
-    if (us_counter < clock_interval_us / 2) {
-      gpio_put(CLOCK_OUT_PIN, true);
-    } else {
-      gpio_put(CLOCK_OUT_PIN, false); // Slave triggers on this Falling Edge
-    }
-  } else if (current_source == CLOCK_INTERNAL) {
-    gpio_put(CLOCK_OUT_PIN, false);
+  // Fixed 2ms Clock Out Pulse - Return to HIGH (Idle)
+  if (current_source == CLOCK_INTERNAL && clock_pin_state &&
+      us_counter >= 2000) {
+    gpio_put(CLOCK_OUT_PIN, true); // Active LOW: Return to Idle
+    clock_pin_state = false;
   }
 
   if (gate_active) {
@@ -259,15 +263,16 @@ void clock_set_cv(uint16_t dac_val) {
 
 void clock_restart() {
   uint32_t save = save_and_disable_interrupts();
-  us_counter = 0; // Wait 1 interval before first tick (standard)
+  us_counter = (clock_interval_us > 0) ? clock_interval_us
+                                       : 5000; // Trigger immediate tick on play
   internal_tick_count = 0;
   tick_flag = false;
   step_advanced_flag = false;
   gpio_put(GATE_PIN, false);
   gate_active = false;
 
-  // Idle at LOW as per c54ac49
-  gpio_put(CLOCK_OUT_PIN, false);
+  // Active LOW: Idle at HIGH
+  gpio_put(CLOCK_OUT_PIN, true);
   clock_pin_state = false;
   last_external_tick_us = 0;
 
