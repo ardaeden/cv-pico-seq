@@ -74,9 +74,9 @@ int main() {
       bool is_playing = seq_toggle_play();
 
       if (is_playing) {
-        clock_restart();
         clock_gate_enable(true);
         clock_out_enable(true);
+        clock_restart();
 
         // LED and UI updates for the first step
         uint32_t cur = seq_current_step();

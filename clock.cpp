@@ -8,7 +8,8 @@
 #include "sequencer.h"
 
 namespace {
-volatile uint64_t us_counter = 0;
+volatile uint32_t us_counter =
+    0; // 32-bit is atomic on M0+, sufficient for ~71 minutes
 volatile uint32_t clock_interval_us = 5000;
 volatile bool tick_flag = false;
 
@@ -16,10 +17,11 @@ constexpr uint GATE_PIN = 6;
 constexpr uint CLOCK_OUT_PIN = 22;
 constexpr uint DAC_CS_PIN = 17;
 volatile bool gate_active = false;
-volatile uint64_t gate_start_us = 0;
+volatile uint32_t gate_start_us = 0; // Changed to 32-bit
 volatile bool gate_enabled = false;
 volatile bool clock_out_enabled = false;
-volatile uint64_t gate_duration_us = 2500;
+volatile uint32_t gate_duration_us = 2500; // Changed to 32-bit
+volatile bool clock_pin_state = false;
 
 constexpr uint CLOCK_EXT_PIN = 21;
 volatile ClockSource current_source = CLOCK_INTERNAL;
@@ -27,6 +29,7 @@ volatile uint8_t gate_length_percent = 50;
 
 volatile uint32_t internal_tick_count = 0;
 volatile bool step_advanced_flag = false;
+volatile uint32_t last_external_tick_us = 0; // For IRQ blanking
 
 constexpr uint8_t MIDI_BASE = 36;
 // 12-bit DAC (4096), gain 2x (4.096V). 1V = 1000 counts.
@@ -105,8 +108,13 @@ void handle_tick() {
 struct repeating_timer timer_state;
 
 void external_clock_callback(uint gpio, uint32_t events) {
-  if (current_source == CLOCK_EXTERNAL) {
-    handle_tick();
+  if (gpio == CLOCK_EXT_PIN && current_source == CLOCK_EXTERNAL) {
+    uint32_t now = (uint32_t)time_us_64();
+    // 2ms Blanking period to prevent noise/bouncing triggers
+    if (now - last_external_tick_us > 2000) {
+      handle_tick();
+      last_external_tick_us = now;
+    }
   }
 }
 
@@ -118,19 +126,19 @@ bool timer_callback(struct repeating_timer *t) {
     handle_tick();
   }
 
-  // 24 PPQN Clock Out (50% Duty Cycle) - Only meaningful in internal mode
+  // Restore c54ac49 Midway-Falling-Edge logic (Rock-solid sync)
   if (current_source == CLOCK_INTERNAL && clock_out_enabled) {
     if (us_counter < clock_interval_us / 2) {
       gpio_put(CLOCK_OUT_PIN, true);
     } else {
-      gpio_put(CLOCK_OUT_PIN, false);
+      gpio_put(CLOCK_OUT_PIN, false); // Slave triggers on this Falling Edge
     }
-  } else {
+  } else if (current_source == CLOCK_INTERNAL) {
     gpio_put(CLOCK_OUT_PIN, false);
   }
 
   if (gate_active) {
-    uint64_t now_us = time_us_64();
+    uint32_t now_us = (uint32_t)time_us_64();
     if ((now_us - gate_start_us) >= gate_duration_us) {
       // ONLY pull gate low if current step is NOT tied
       uint32_t current_step = seq_current_step();
@@ -145,19 +153,19 @@ bool timer_callback(struct repeating_timer *t) {
 }
 
 void core1_main() {
-  // Enable GPIO interrupt on Core 1 specifically
+  // Enable GPIO interrupt on Core 1 specifically (Active LOW: trigger on
+  // FALLING edge)
   gpio_set_irq_enabled_with_callback(CLOCK_EXT_PIN, GPIO_IRQ_EDGE_FALL, true,
                                      &external_clock_callback);
 
-  // Core 1 loop with microsecond precision
+  // Core 1 loop with microsecond precision and catch-up
   uint64_t last_us = time_us_64();
   while (true) {
     uint64_t now_us = time_us_64();
-    uint64_t diff = now_us - last_us;
 
-    // Simulate 100us timer tick
-    if (diff >= 100) {
-      last_us = now_us;
+    // Catch-up mechanism: process all missed 100us steps if any
+    while (now_us - last_us >= 100) {
+      last_us += 100;
       timer_callback(NULL);
     }
 
@@ -178,11 +186,10 @@ bool clock_consume_step() {
 }
 
 void clock_set_bpm(uint32_t bpm) {
-  uint64_t us_per_quarter = 60000000ULL / (bpm ? bpm : 120);
-  clock_interval_us = static_cast<uint32_t>(us_per_quarter / 24);
+  uint32_t us_per_quarter = 60000000UL / (bpm ? bpm : 120);
+  clock_interval_us = us_per_quarter / 24;
   // recalculate gate duration based on current gate length
-  gate_duration_us =
-      (uint64_t)clock_interval_us * 6 * gate_length_percent / 100;
+  gate_duration_us = (clock_interval_us * 6 * gate_length_percent / 100);
 }
 
 void clock_set_gate_length(uint8_t percent) {
@@ -202,7 +209,7 @@ void clock_init() {
 
   gpio_init(CLOCK_OUT_PIN);
   gpio_set_dir(CLOCK_OUT_PIN, GPIO_OUT);
-  gpio_put(CLOCK_OUT_PIN, false);
+  gpio_put(CLOCK_OUT_PIN, true); // Active LOW: Idle at HIGH
 
   gpio_init(CLOCK_EXT_PIN);
   gpio_set_dir(CLOCK_EXT_PIN, GPIO_IN);
@@ -252,11 +259,17 @@ void clock_set_cv(uint16_t dac_val) {
 
 void clock_restart() {
   uint32_t save = save_and_disable_interrupts();
-  us_counter = 0;
+  us_counter = 0; // Wait 1 interval before first tick (standard)
   internal_tick_count = 0;
   tick_flag = false;
   step_advanced_flag = false;
   gpio_put(GATE_PIN, false);
   gate_active = false;
+
+  // Idle at LOW as per c54ac49
+  gpio_put(CLOCK_OUT_PIN, false);
+  clock_pin_state = false;
+  last_external_tick_us = 0;
+
   restore_interrupts(save);
 }
