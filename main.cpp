@@ -27,15 +27,17 @@ int main() {
               encoder_step == 10);
   ui_show_steps(seq_get_steps(), seq_get_steps());
 
-  // Output handling moved to Core 1
-
   enum EditMode {
     EDIT_NONE,
     EDIT_SELECT_STEP,
     EDIT_NOTE,
     EDIT_VELOCITY,
     PATTERN_SELECT,
-    SETTINGS
+    SETTINGS,
+    PATTERN_TOOLS,
+    TOOLS_RANDOM_GATES,
+    TOOLS_RANDOM_PITCHES,
+    TOOLS_CLEAR
   };
   EditMode edit_mode = EDIT_NONE;
   uint32_t edit_step = 0;
@@ -45,14 +47,23 @@ int main() {
   bool settings_edit_mode = false;
   const int NUM_SETTINGS = 3;
 
+  int tools_selection = 0;
+  uint8_t temp_density = 50;
+  int temp_scale_idx = 0;
+  bool clear_confirmed = false;
+
   bool blink_active = false;
   uint64_t blink_start_time = 0;
   uint8_t blink_slot = 0;
 
-  // Interaction tracking for Step Button modifier logic
   bool step_button_down = false;
   uint64_t step_button_press_start_us = 0;
   bool step_button_was_modified = false;
+
+  // Edit Button State Machine for Clean Long-Press
+  bool edit_button_down = false;
+  uint64_t edit_press_start_us = 0;
+  bool edit_long_press_triggered = false;
 
   while (true) {
     io_update_led();
@@ -69,38 +80,32 @@ int main() {
       }
     }
 
+    // --- TRANSPORT CONTROLS ---
     if (io_poll_play_toggle()) {
       bool was_playing = seq_is_playing();
       bool is_playing = seq_toggle_play();
-
       if (is_playing) {
         clock_gate_enable(true);
         clock_out_enable(true);
         clock_restart();
-
-        // LED and UI updates for the first step
-        uint32_t cur = seq_current_step();
-        if (cur % 4 == 0) {
+        if (seq_current_step() % 4 == 0)
           io_blink_led_start();
-        }
         if (edit_mode == EDIT_NONE) {
-          ui_show_steps(cur, seq_get_steps());
-          int8_t pending = seq_get_pending_pattern();
+          ui_show_steps(seq_current_step(), seq_get_steps());
           current_tstate = TSTATE_PLAY;
           ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                      current_tstate, pending >= 0, encoder_step == 10);
+                      current_tstate, seq_get_pending_pattern() >= 0,
+                      encoder_step == 10);
         }
       } else {
         clock_gate_enable(false);
         clock_out_enable(false);
         current_tstate = TSTATE_PAUSE;
-        if (edit_mode == EDIT_NONE) {
+        if (edit_mode == EDIT_NONE)
           ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
                       current_tstate, false, encoder_step == 10);
-        }
-        if (was_playing && seq_has_dirty_patterns()) {
+        if (was_playing && seq_has_dirty_patterns())
           seq_flush_all_patterns_to_eeprom();
-        }
       }
     }
 
@@ -108,21 +113,61 @@ int main() {
       seq_stop();
       clock_gate_enable(false);
       clock_out_enable(false);
-      clock_out_enable(false);
-
-      if (seq_has_dirty_patterns()) {
+      if (seq_has_dirty_patterns())
         seq_flush_all_patterns_to_eeprom();
-      }
-
       current_tstate = TSTATE_STOP;
-
       if (edit_mode == EDIT_NONE) {
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
                     current_tstate, false, encoder_step == 10);
         ui_show_steps(seq_get_steps(), seq_get_steps());
-      } else if (edit_mode == PATTERN_SELECT) {
+      }
+    }
+
+    // --- EDIT BUTTON LOGIC (Press-and-Hold / Release) ---
+    bool edit_now = io_is_edit_button_pressed();
+    if (edit_now && !edit_button_down) {
+      edit_button_down = true;
+      edit_press_start_us = time_us_64();
+      edit_long_press_triggered = false;
+    } else if (edit_now && edit_button_down && !edit_long_press_triggered) {
+      if (time_us_64() - edit_press_start_us > 500000) { // 500ms threshold
+        edit_long_press_triggered = true;
+        edit_mode = PATTERN_TOOLS;
+        tools_selection = 0;
+        ui_show_pattern_tools(tools_selection);
+      }
+    } else if (!edit_now && edit_button_down) {
+      // Button Released
+      if (!edit_long_press_triggered) {
+        // Short Press: Toggle Edit Modes
+        if (edit_mode == EDIT_NONE || edit_mode == SETTINGS ||
+            edit_mode == PATTERN_SELECT || edit_mode == PATTERN_TOOLS ||
+            edit_mode == TOOLS_RANDOM_GATES ||
+            edit_mode == TOOLS_RANDOM_PITCHES || edit_mode == TOOLS_CLEAR) {
+          edit_mode = EDIT_SELECT_STEP;
+          edit_step = 0;
+          ui_show_edit_step(edit_step, seq_get_note(edit_step));
+        } else if (edit_mode == EDIT_SELECT_STEP) {
+          edit_mode = EDIT_NONE;
+          ui_clear();
+          ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
+                      current_tstate, false, encoder_step == 10);
+          ui_show_steps(seq_current_step(), seq_get_steps());
+        } else {
+          edit_mode = EDIT_SELECT_STEP;
+          ui_show_edit_step(edit_step, seq_get_note(edit_step));
+        }
+      }
+      edit_button_down = false;
+    }
+
+    // --- PATTERN BUTTON ACTIONS ---
+    if (io_poll_pattern_select_button()) {
+      if (edit_mode != PATTERN_SELECT) {
+        edit_mode = PATTERN_SELECT;
+        temp_pattern_slot = pattern_slot;
         ui_show_pattern_select(temp_pattern_slot);
-      } else if (edit_mode == SETTINGS) {
+      } else {
         edit_mode = EDIT_NONE;
         ui_clear();
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
@@ -131,52 +176,46 @@ int main() {
       }
     }
 
-    if (io_poll_edit_toggle()) {
-      if (edit_mode == EDIT_NONE) {
-        edit_mode = EDIT_SELECT_STEP;
-        edit_step = 0;
-        ui_show_edit_step(edit_step, seq_get_note(edit_step));
-      } else if (edit_mode == EDIT_SELECT_STEP) {
-        edit_mode = EDIT_NONE;
-        ui_clear();
-        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, false, encoder_step == 10);
-        ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
-                      seq_get_steps());
-      } else if (edit_mode == EDIT_NOTE || edit_mode == EDIT_VELOCITY) {
-        edit_mode = EDIT_SELECT_STEP;
-        ui_clear();
-        ui_show_edit_step(edit_step, seq_get_note(edit_step));
+    // --- SAVE BUTTON ACTIONS (BACK in tools) ---
+    if (io_poll_save_button()) {
+      if (edit_mode == PATTERN_SELECT) {
+        seq_save_pattern_ram_only(temp_pattern_slot);
+        if (!seq_is_playing())
+          seq_flush_all_patterns_to_eeprom();
+        pattern_slot = temp_pattern_slot;
+        clear_region(40, 16, 48, 32);
+        ssd1306_update();
+        blink_active = true;
+        blink_start_time = time_us_64();
+        blink_slot = temp_pattern_slot;
       } else if (edit_mode == SETTINGS) {
         edit_mode = EDIT_NONE;
         ui_clear();
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
                     current_tstate, false, encoder_step == 10);
-        ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
-                      seq_get_steps());
-      } else if (edit_mode == PATTERN_SELECT) {
-        edit_mode = EDIT_SELECT_STEP;
-        edit_step = 0;
-        ui_show_edit_step(edit_step, seq_get_note(edit_step));
-      }
-    }
-
-    if (io_poll_pattern_select_button()) {
-      if (edit_mode == EDIT_NONE || edit_mode == EDIT_SELECT_STEP ||
-          edit_mode == EDIT_NOTE || edit_mode == SETTINGS) {
-        edit_mode = PATTERN_SELECT;
-        temp_pattern_slot = pattern_slot;
-        ui_show_pattern_select(temp_pattern_slot);
-      } else if (edit_mode == PATTERN_SELECT) {
+        ui_show_steps(seq_current_step(), seq_get_steps());
+      } else if (edit_mode == PATTERN_TOOLS) {
         edit_mode = EDIT_NONE;
         ui_clear();
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
                     current_tstate, false, encoder_step == 10);
-        ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
-                      seq_get_steps());
+        ui_show_steps(seq_current_step(), seq_get_steps());
+      } else if (edit_mode == TOOLS_RANDOM_GATES ||
+                 edit_mode == TOOLS_RANDOM_PITCHES ||
+                 edit_mode == TOOLS_CLEAR) {
+        edit_mode = PATTERN_TOOLS;
+        ui_show_pattern_tools(tools_selection);
+      } else {
+        edit_mode = SETTINGS;
+        settings_option = 0;
+        settings_edit_mode = false;
+        ui_show_settings(settings_option, clock_get_source(),
+                         clock_get_gate_length(), clock_get_ppqn(),
+                         settings_edit_mode);
       }
     }
 
+    // --- ENCODER ACTIONS ---
     if (io_encoder_button_pressed()) {
       if (edit_mode == EDIT_SELECT_STEP) {
         edit_mode = EDIT_NOTE;
@@ -192,11 +231,10 @@ int main() {
         ui_show_edit_note(edit_step, seq_get_note(edit_step),
                           seq_get_velocity(edit_step), false);
       } else if (edit_mode == PATTERN_SELECT) {
-        if (seq_is_playing()) {
+        if (seq_is_playing())
           seq_queue_pattern(temp_pattern_slot);
-        } else {
+        else
           seq_load_pattern(temp_pattern_slot);
-        }
         pattern_slot = temp_pattern_slot;
         edit_mode = EDIT_NONE;
         ui_clear();
@@ -206,18 +244,54 @@ int main() {
                       seq_get_steps());
       } else if (edit_mode == SETTINGS) {
         if (settings_option == 0) {
-          ClockSource current = clock_get_source();
-          clock_set_source(current == CLOCK_INTERNAL ? CLOCK_EXTERNAL
-                                                     : CLOCK_INTERNAL);
-          ui_show_settings(settings_option, clock_get_source(),
-                           clock_get_gate_length(), clock_get_ppqn(),
-                           settings_edit_mode);
+          clock_set_source(clock_get_source() == CLOCK_INTERNAL
+                               ? CLOCK_EXTERNAL
+                               : CLOCK_INTERNAL);
         } else if (settings_option == 1 || settings_option == 2) {
           settings_edit_mode = !settings_edit_mode;
-          ui_show_settings(settings_option, clock_get_source(),
-                           clock_get_gate_length(), clock_get_ppqn(),
-                           settings_edit_mode);
         }
+        ui_show_settings(settings_option, clock_get_source(),
+                         clock_get_gate_length(), clock_get_ppqn(),
+                         settings_edit_mode);
+      } else if (edit_mode == PATTERN_TOOLS) {
+        if (tools_selection == 0) { // Random Gates
+          edit_mode = TOOLS_RANDOM_GATES;
+          temp_density = 50;
+          seq_randomize_gates(temp_density);
+          ui_show_chaos_generator(seq_get_gate_mask(), temp_density);
+        } else if (tools_selection == 1) { // Random Pitches
+          edit_mode = TOOLS_RANDOM_PITCHES;
+          temp_scale_idx = 0;
+          seq_randomize_pitches(temp_scale_idx);
+          ui_show_random_pitches(temp_scale_idx,
+                                 seq_get_scale_name(temp_scale_idx));
+        } else if (tools_selection == 2) { // Clear
+          edit_mode = TOOLS_CLEAR;
+          clear_confirmed = false;
+          ui_show_clear_gates_confirm(clear_confirmed);
+        } else { // Back
+          edit_mode = EDIT_NONE;
+          ui_clear();
+          ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
+                      current_tstate, false, encoder_step == 10);
+          ui_show_steps(seq_current_step(), seq_get_steps());
+        }
+      } else if (edit_mode == TOOLS_RANDOM_GATES) {
+        seq_randomize_gates(temp_density);
+        ui_show_chaos_generator(seq_get_gate_mask(), temp_density);
+      } else if (edit_mode == TOOLS_RANDOM_PITCHES) {
+        seq_randomize_pitches(temp_scale_idx);
+        ui_show_random_pitches(temp_scale_idx,
+                               seq_get_scale_name(temp_scale_idx));
+      } else if (edit_mode == TOOLS_CLEAR) {
+        seq_clear_gates();
+        clear_confirmed = true;
+        ui_show_clear_gates_confirm(clear_confirmed);
+        edit_mode = EDIT_NONE;
+        ui_clear();
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
+                    current_tstate, false, encoder_step == 10);
+        ui_show_steps(seq_current_step(), seq_get_steps());
       } else if (edit_mode == EDIT_NONE) {
         encoder_step = (encoder_step == 1) ? 10 : 1;
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
@@ -229,58 +303,46 @@ int main() {
     if (encoder_delta != 0) {
       if (edit_mode == EDIT_SELECT_STEP) {
         if (io_is_step_button_pressed()) {
-          // Backward tie prevention: Only CW (encoder_delta > 0)
-          // creates/extends ties from the selected step.
-          if (encoder_delta > 0) {
-            bool current_tie = seq_get_tie(edit_step);
-            seq_set_tie(edit_step, !current_tie);
-            step_button_was_modified = true;
-          } else if (encoder_delta < 0) {
+          if (encoder_delta > 0)
+            seq_set_tie(edit_step, !seq_get_tie(edit_step));
+          else
             seq_set_tie(edit_step, false);
-            step_button_was_modified = true;
-          }
+          step_button_was_modified = true;
           ui_show_edit_step(edit_step, seq_get_note(edit_step));
         } else {
-          int new_step = (int)edit_step + encoder_delta;
-          if (new_step < 0)
-            new_step = 0;
-          if (new_step > 31)
-            new_step = 31;
-          edit_step = (uint32_t)new_step;
+          int ns = (int)edit_step + encoder_delta;
+          if (ns < 0)
+            ns = 0;
+          if (ns > 31)
+            ns = 31;
+          edit_step = (uint32_t)ns;
           ui_show_edit_step(edit_step, seq_get_note(edit_step));
         }
-
       } else if (edit_mode == EDIT_NOTE) {
-        uint8_t current_note = seq_get_note(edit_step);
-        int new_note = (int)current_note + encoder_delta;
-        if (new_note < 36)
-          new_note = 36;
-        if (new_note > 84)
-          new_note = 84;
-        seq_set_note(edit_step, (uint8_t)new_note);
-        ui_show_edit_note(edit_step, (uint8_t)new_note,
-                          seq_get_velocity(edit_step));
-
+        int nn = (int)seq_get_note(edit_step) + encoder_delta;
+        if (nn < 36)
+          nn = 36;
+        if (nn > 84)
+          nn = 84;
+        seq_set_note(edit_step, (uint8_t)nn);
+        ui_show_edit_note(edit_step, (uint8_t)nn, seq_get_velocity(edit_step));
       } else if (edit_mode == EDIT_VELOCITY) {
-        uint8_t current_velo = seq_get_velocity(edit_step);
-        int new_velo = (int)current_velo + encoder_delta;
-        if (new_velo < 0)
-          new_velo = 0;
-        if (new_velo > 4)
-          new_velo = 4;
-        seq_set_velocity(edit_step, (uint8_t)new_velo);
-        ui_show_edit_note(edit_step, seq_get_note(edit_step), (uint8_t)new_velo,
+        int nv = (int)seq_get_velocity(edit_step) + encoder_delta;
+        if (nv < 0)
+          nv = 0;
+        if (nv > 4)
+          nv = 4;
+        seq_set_velocity(edit_step, (uint8_t)nv);
+        ui_show_edit_note(edit_step, seq_get_note(edit_step), (uint8_t)nv,
                           true);
-
       } else if (edit_mode == PATTERN_SELECT) {
-        int new_slot = (int)temp_pattern_slot + encoder_delta;
-        if (new_slot < 0)
-          new_slot = 24;
-        if (new_slot > 24)
-          new_slot = 0;
-        temp_pattern_slot = (uint8_t)new_slot;
+        int ns = (int)temp_pattern_slot + encoder_delta;
+        if (ns < 0)
+          ns = 24;
+        if (ns > 24)
+          ns = 0;
+        temp_pattern_slot = (uint8_t)ns;
         ui_show_pattern_select(temp_pattern_slot);
-
       } else if (edit_mode == SETTINGS) {
         if (!settings_edit_mode) {
           settings_option += encoder_delta;
@@ -289,21 +351,20 @@ int main() {
           if (settings_option >= NUM_SETTINGS)
             settings_option = 0;
         } else {
-          if (settings_option == 1) { // Gate Length
+          if (settings_option == 1) {
             int len = (int)clock_get_gate_length() + encoder_delta * 10;
             if (len < 10)
               len = 10;
             if (len > 90)
               len = 90;
             clock_set_gate_length((uint8_t)len);
-          } else if (settings_option == 2) { // PPQN
+          } else if (settings_option == 2) {
             static const uint32_t ppqns[] = {4, 8, 12, 16, 24, 48};
-            uint32_t current = clock_get_ppqn();
-            int idx = 4; // default 24
-            for (int i = 0; i < 6; i++) {
-              if (ppqns[i] == current)
+            uint32_t curr = clock_get_ppqn();
+            int idx = 4;
+            for (int i = 0; i < 6; i++)
+              if (ppqns[i] == curr)
                 idx = i;
-            }
             idx += encoder_delta;
             if (idx < 0)
               idx = 0;
@@ -315,110 +376,78 @@ int main() {
         ui_show_settings(settings_option, clock_get_source(),
                          clock_get_gate_length(), clock_get_ppqn(),
                          settings_edit_mode);
+      } else if (edit_mode == PATTERN_TOOLS) {
+        tools_selection += encoder_delta;
+        if (tools_selection < 0)
+          tools_selection = 3; // 4 options
+        if (tools_selection > 3)
+          tools_selection = 0;
+        ui_show_pattern_tools(tools_selection);
+      } else if (edit_mode == TOOLS_RANDOM_GATES) {
+        int d = (int)temp_density + encoder_delta * 5;
+        if (d < 0)
+          d = 0;
+        if (d > 100)
+          d = 100;
+        temp_density = (uint8_t)d;
+        seq_randomize_gates(temp_density);
+        ui_show_chaos_generator(seq_get_gate_mask(), temp_density);
+      } else if (edit_mode == TOOLS_RANDOM_PITCHES) {
+        temp_scale_idx += encoder_delta;
+        int max_scales = seq_get_num_scales();
+        if (temp_scale_idx < 0)
+          temp_scale_idx = max_scales - 1;
+        if (temp_scale_idx >= max_scales)
+          temp_scale_idx = 0;
+        seq_randomize_pitches(temp_scale_idx);
+        ui_show_random_pitches(temp_scale_idx,
+                               seq_get_scale_name(temp_scale_idx));
       } else if (edit_mode == EDIT_NONE) {
         if (io_is_step_button_pressed()) {
-          uint32_t current_steps = seq_get_steps();
-          int new_steps = (int)current_steps + encoder_delta;
-          if (new_steps < 1)
-            new_steps = 1;
-          if (new_steps > 32)
-            new_steps = 32;
-          seq_set_steps((uint32_t)new_steps);
-          ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
-                        (uint32_t)new_steps);
+          int ns = (int)seq_get_steps() + encoder_delta;
+          if (ns < 1)
+            ns = 1;
+          if (ns > 32)
+            ns = 32;
+          seq_set_steps((uint32_t)ns);
+          ui_show_steps(seq_current_step(), (uint32_t)ns);
           step_button_was_modified = true;
         } else {
           if (clock_get_source() == CLOCK_INTERNAL) {
-            uint32_t current_bpm = seq_get_bpm();
-            int new_bpm = (int)current_bpm + encoder_delta * encoder_step;
-            if (new_bpm < 20)
-              new_bpm = 20;
-            if (new_bpm > 300)
-              new_bpm = 300;
-
-            seq_set_bpm((uint32_t)new_bpm);
-            clock_set_bpm((uint32_t)new_bpm);
-            ui_show_bpm((uint32_t)new_bpm, pattern_slot, clock_get_source(),
+            int nb = (int)seq_get_bpm() + encoder_delta * encoder_step;
+            if (nb < 20)
+              nb = 20;
+            if (nb > 300)
+              nb = 300;
+            seq_set_bpm((uint32_t)nb);
+            clock_set_bpm((uint32_t)nb);
+            ui_show_bpm((uint32_t)nb, pattern_slot, clock_get_source(),
                         current_tstate, false, encoder_step == 10);
           }
         }
       }
     }
 
-    // --- Interaction Refinement: Manually track Step Button for trigger on
-    // release ---
-    bool step_now = io_is_step_button_pressed();
-    if (step_now && !step_button_down) {
-      // Button Press
-      step_button_down = true;
-      step_button_press_start_us = time_us_64();
-      step_button_was_modified = false;
-    } else if (!step_now && step_button_down) {
-      // Button Release
-      uint64_t hold_duration = time_us_64() - step_button_press_start_us;
+    // --- STEP BUTTON RELEASE LOGIC ---
+    if (io_is_step_button_pressed()) {
+      if (!step_button_down) {
+        step_button_down = true;
+        step_button_press_start_us = time_us_64();
+        step_button_was_modified = false;
+      }
+    } else if (step_button_down) {
+      uint64_t hold = time_us_64() - step_button_press_start_us;
       step_button_down = false;
-
-      // Only trigger if:
-      // 1. Not used as a modifier (for ties or step count)
-      // 2. Not a "long press" (held longer than 500ms) - strictly optional but
-      // good for UX
-      if (!step_button_was_modified && hold_duration < 500000) {
+      if (!step_button_was_modified && hold < 500000) {
         if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE ||
             edit_mode == EDIT_VELOCITY) {
           seq_toggle_gate(edit_step);
-          if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_VELOCITY) {
+          if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_VELOCITY)
             ui_show_edit_step(edit_step, seq_get_note(edit_step));
-          } else {
+          else
             ui_show_edit_note(edit_step, seq_get_note(edit_step),
                               seq_get_velocity(edit_step));
-          }
         }
-      }
-    }
-
-    if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE ||
-        edit_mode == EDIT_VELOCITY) {
-      // REMOVED: io_poll_step_button() handler here since we use release logic
-      // above
-      if (io_poll_save_button()) {
-        edit_mode = SETTINGS;
-        settings_option = 0;
-        settings_edit_mode = false;
-        ui_show_settings(settings_option, clock_get_source(),
-                         clock_get_gate_length(), clock_get_ppqn(),
-                         settings_edit_mode);
-      }
-    } else if (edit_mode == PATTERN_SELECT) {
-      if (io_poll_save_button()) {
-        seq_save_pattern_ram_only(temp_pattern_slot);
-        if (!seq_is_playing()) {
-          seq_flush_all_patterns_to_eeprom();
-        }
-        pattern_slot = temp_pattern_slot;
-
-        clear_region(40, 16, 48, 32);
-        ssd1306_update();
-        blink_active = true;
-        blink_start_time = time_us_64();
-        blink_slot = temp_pattern_slot;
-      }
-    } else if (edit_mode == SETTINGS) {
-      if (io_poll_save_button()) {
-        edit_mode = EDIT_NONE;
-        ui_clear();
-        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, false, encoder_step == 10);
-        ui_show_steps(seq_is_playing() ? seq_current_step() : seq_get_steps(),
-                      seq_get_steps());
-      }
-    } else if (edit_mode == EDIT_NONE) {
-      if (io_poll_save_button()) {
-        edit_mode = SETTINGS;
-        settings_option = 0;
-        settings_edit_mode = false;
-        ui_show_settings(settings_option, clock_get_source(),
-                         clock_get_gate_length(), clock_get_ppqn(),
-                         settings_edit_mode);
       }
     }
 
@@ -426,19 +455,13 @@ int main() {
       uint32_t cur = seq_current_step();
       if (edit_mode == EDIT_NONE) {
         ui_show_steps(cur, seq_get_steps());
-
-        int8_t pending = seq_get_pending_pattern();
-        bool blink = false;
-        if (pending >= 0) {
-          blink = (cur % 4 < 2);
-        }
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, blink, encoder_step == 10);
+                    current_tstate,
+                    seq_get_pending_pattern() >= 0 && (cur % 4 < 2),
+                    encoder_step == 10);
       }
-
-      if (cur % 4 == 0) {
+      if (cur % 4 == 0)
         io_blink_led_start();
-      }
     }
 
     tight_loop_contents();
