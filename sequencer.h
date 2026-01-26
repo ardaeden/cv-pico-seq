@@ -43,6 +43,14 @@ void seq_save_pattern_ram_only(uint8_t slot);
 void seq_flush_all_patterns_to_eeprom();
 bool seq_has_dirty_patterns();
 void seq_load_pattern(uint8_t slot);
+// Randomize pitches based on a scale index (quantized randomization)
+void seq_randomize_pitches(int scale_idx,
+                           uint8_t root_note = 48); // default C3 root
+void seq_randomize_gates(uint8_t density_percent);
+void seq_clear_gates();
+int seq_get_num_scales();
+const char *seq_get_scale_name(int scale_idx);
+
 void seq_queue_pattern(uint8_t slot);
 int8_t seq_get_pending_pattern();
 void seq_init_flash();

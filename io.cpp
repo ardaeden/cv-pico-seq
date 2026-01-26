@@ -12,7 +12,7 @@ constexpr uint STEP_BUTTON_PIN = 8;            // GP8 - Step count button
 constexpr uint EDIT_BUTTON_PIN = 10;           // GP10 - Edit mode button
 constexpr uint PATTERN_SELECT_BUTTON_PIN = 11; // GP11 - Pattern select button
 constexpr uint SAVE_BUTTON_PIN = 12;           // GP12 - Save button
-constexpr uint64_t DEBOUNCE_US = 50'000;       // 50 ms debounce window
+constexpr uint64_t DEBOUNCE_US = 20'000;       // 20 ms debounce is enough
 constexpr uint LED_PIN = 3;                    // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 20'000; // 20 ms LED on time
 
@@ -20,27 +20,45 @@ constexpr uint ENCODER_CLK = 14;
 constexpr uint ENCODER_DATA = 15;
 constexpr uint ENCODER_SW = 13;
 
-bool button_prev = true;
-uint64_t last_button_event_us = 0;
+struct ButtonTracker {
+  uint pin;
+  bool last_raw = true;
+  bool debounced_state = false; // true = pressed
+  uint64_t last_change_us = 0;
+  bool edge_fell = false;
 
-bool edit_button_prev = true;
-uint64_t last_edit_button_event_us = 0;
+  void update() {
+    bool current_raw = gpio_get(pin);
+    uint64_t now = time_us_64();
+    if (current_raw != last_raw) {
+      last_change_us = now;
+      last_raw = current_raw;
+    }
+    if ((now - last_change_us) >= DEBOUNCE_US) {
+      bool next_debounced = !current_raw; // Active Low
+      if (next_debounced && !debounced_state) {
+        edge_fell = true; // Button just pressed
+      }
+      debounced_state = next_debounced;
+    }
+  }
 
-bool pattern_select_button_prev = true;
-uint64_t last_pattern_select_button_event_us = 0;
+  bool poll_press() {
+    bool ret = edge_fell;
+    edge_fell = false;
+    return ret;
+  }
 
-bool save_button_prev = true;
-uint64_t last_save_button_event_us = 0;
+  bool is_pressed() const { return debounced_state; }
+};
 
-bool stop_button_prev = true;
-uint64_t last_stop_button_event_us = 0;
-
-bool step_button_prev = true;
-uint64_t last_step_button_event_us = 0;
-bool step_button_state_debounced = false; // Add this
-
-bool encoder_sw_prev = true;
-uint64_t last_encoder_sw_event_us = 0;
+ButtonTracker play_btn = {BUTTON_PIN};
+ButtonTracker stop_btn = {STOP_BUTTON_PIN};
+ButtonTracker step_btn = {STEP_BUTTON_PIN};
+ButtonTracker edit_btn = {EDIT_BUTTON_PIN};
+ButtonTracker pattern_btn = {PATTERN_SELECT_BUTTON_PIN};
+ButtonTracker save_btn = {SAVE_BUTTON_PIN};
+ButtonTracker encoder_btn = {ENCODER_SW};
 
 bool led_blinking = false;
 uint64_t led_blink_start_us = 0;
@@ -55,135 +73,59 @@ void encoder_gpio_irq(uint gpio, uint32_t events);
 } // namespace
 
 void io_init() {
-  gpio_init(BUTTON_PIN);
-  gpio_set_dir(BUTTON_PIN, GPIO_IN);
-  gpio_pull_up(BUTTON_PIN);
-  button_prev = gpio_get(BUTTON_PIN);
-
-  gpio_init(STOP_BUTTON_PIN);
-  gpio_set_dir(STOP_BUTTON_PIN, GPIO_IN);
-  gpio_pull_up(STOP_BUTTON_PIN);
-  stop_button_prev = gpio_get(STOP_BUTTON_PIN);
-
-  gpio_init(STEP_BUTTON_PIN);
-  gpio_set_dir(STEP_BUTTON_PIN, GPIO_IN);
-  gpio_pull_up(STEP_BUTTON_PIN);
-  step_button_prev = gpio_get(STEP_BUTTON_PIN);
-
-  gpio_init(EDIT_BUTTON_PIN);
-  gpio_set_dir(EDIT_BUTTON_PIN, GPIO_IN);
-  gpio_pull_up(EDIT_BUTTON_PIN);
-  edit_button_prev = gpio_get(EDIT_BUTTON_PIN);
-
-  gpio_init(PATTERN_SELECT_BUTTON_PIN);
-  gpio_set_dir(PATTERN_SELECT_BUTTON_PIN, GPIO_IN);
-  gpio_pull_up(PATTERN_SELECT_BUTTON_PIN);
-  pattern_select_button_prev = gpio_get(PATTERN_SELECT_BUTTON_PIN);
-
-  gpio_init(SAVE_BUTTON_PIN);
-  gpio_set_dir(SAVE_BUTTON_PIN, GPIO_IN);
-  gpio_pull_up(SAVE_BUTTON_PIN);
-  save_button_prev = gpio_get(SAVE_BUTTON_PIN);
+  uint buttons[] = {
+      BUTTON_PIN,      STOP_BUTTON_PIN,           STEP_BUTTON_PIN,
+      EDIT_BUTTON_PIN, PATTERN_SELECT_BUTTON_PIN, SAVE_BUTTON_PIN};
+  for (uint pin : buttons) {
+    gpio_init(pin);
+    gpio_set_dir(pin, GPIO_IN);
+    gpio_pull_up(pin);
+  }
 
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
 }
 
 bool io_poll_play_toggle() {
-  bool button_now = gpio_get(BUTTON_PIN);
-  uint64_t now_us = time_us_64();
-  if (button_now != button_prev &&
-      (now_us - last_button_event_us) >= DEBOUNCE_US) {
-    button_prev = button_now;
-    last_button_event_us = now_us;
-    if (!button_now) {
-      return true;
-    }
-  }
-  return false;
+  play_btn.update();
+  return play_btn.poll_press();
 }
-
 bool io_poll_edit_toggle() {
-  bool button_now = gpio_get(EDIT_BUTTON_PIN);
-  uint64_t now_us = time_us_64();
-  if (button_now != edit_button_prev &&
-      (now_us - last_edit_button_event_us) >= DEBOUNCE_US) {
-    edit_button_prev = button_now;
-    last_edit_button_event_us = now_us;
-    if (!button_now) {
-      return true;
-    }
-  }
-  return false;
+  edit_btn.update();
+  return edit_btn.poll_press();
 }
-
+bool io_is_edit_button_pressed() {
+  edit_btn.update();
+  return edit_btn.is_pressed();
+}
 bool io_poll_pattern_select_button() {
-  bool button_now = gpio_get(PATTERN_SELECT_BUTTON_PIN);
-  uint64_t now_us = time_us_64();
-  if (button_now != pattern_select_button_prev &&
-      (now_us - last_pattern_select_button_event_us) >= DEBOUNCE_US) {
-    pattern_select_button_prev = button_now;
-    last_pattern_select_button_event_us = now_us;
-    if (!button_now) {
-      return true;
-    }
-  }
-  return false;
+  pattern_btn.update();
+  return pattern_btn.poll_press();
 }
-
 bool io_poll_save_button() {
-  bool button_now = gpio_get(SAVE_BUTTON_PIN);
-  uint64_t now_us = time_us_64();
-  if (button_now != save_button_prev &&
-      (now_us - last_save_button_event_us) >= DEBOUNCE_US) {
-    save_button_prev = button_now;
-    last_save_button_event_us = now_us;
-    if (!button_now) {
-      return true;
-    }
-  }
-  return false;
+  save_btn.update();
+  return save_btn.poll_press();
 }
-
 bool io_poll_stop_button() {
-  bool button_now = gpio_get(STOP_BUTTON_PIN);
-  uint64_t now_us = time_us_64();
-  if (button_now != stop_button_prev &&
-      (now_us - last_stop_button_event_us) >= DEBOUNCE_US) {
-    stop_button_prev = button_now;
-    last_stop_button_event_us = now_us;
-    if (!button_now) {
-      return true;
-    }
-  }
-  return false;
+  stop_btn.update();
+  return stop_btn.poll_press();
+}
+bool io_poll_step_button() {
+  step_btn.update();
+  return step_btn.poll_press();
 }
 
 bool io_is_step_button_pressed() {
-  // Update the debounced state
-  bool button_now = gpio_get(STEP_BUTTON_PIN);
-  uint64_t now_us = time_us_64();
-  if (button_now != step_button_prev &&
-      (now_us - last_step_button_event_us) >= DEBOUNCE_US) {
-    step_button_prev = button_now;
-    last_step_button_event_us = now_us;
-    step_button_state_debounced = !button_now;
-  }
-  return step_button_state_debounced;
+  step_btn.update();
+  return step_btn.is_pressed();
 }
-
-bool io_poll_step_button() {
-  bool button_now = gpio_get(STEP_BUTTON_PIN);
-  uint64_t now_us = time_us_64();
-  if (button_now != step_button_prev &&
-      (now_us - last_step_button_event_us) >= DEBOUNCE_US) {
-    step_button_prev = button_now;
-    last_step_button_event_us = now_us;
-    if (!button_now) {
-      return true;
-    }
-  }
-  return false;
+bool io_is_save_button_pressed() {
+  save_btn.update();
+  return save_btn.is_pressed();
+}
+bool io_is_pattern_select_button_pressed() {
+  pattern_btn.update();
+  return pattern_btn.is_pressed();
 }
 
 void io_blink_led_start() {
@@ -206,11 +148,9 @@ void io_encoder_init() {
   gpio_init(ENCODER_CLK);
   gpio_set_dir(ENCODER_CLK, GPIO_IN);
   gpio_pull_up(ENCODER_CLK);
-
   gpio_init(ENCODER_DATA);
   gpio_set_dir(ENCODER_DATA, GPIO_IN);
   gpio_pull_up(ENCODER_DATA);
-
   gpio_init(ENCODER_SW);
   gpio_set_dir(ENCODER_SW, GPIO_IN);
   gpio_pull_up(ENCODER_SW);
@@ -218,7 +158,6 @@ void io_encoder_init() {
   bool clk = gpio_get(ENCODER_CLK);
   bool data = gpio_get(ENCODER_DATA);
   encoder_prev_state = (uint8_t)((clk << 1) | data);
-  encoder_sw_prev = gpio_get(ENCODER_SW);
 
   gpio_set_irq_enabled_with_callback(ENCODER_CLK,
                                      GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL,
@@ -228,24 +167,18 @@ void io_encoder_init() {
                                      true, encoder_gpio_irq);
 }
 
-int io_encoder_poll_delta() {
-  int pending = encoder_pending.exchange(0);
-  return pending;
-}
+int io_encoder_poll_delta() { return encoder_pending.exchange(0); }
 
 namespace {
 void encoder_gpio_irq(uint gpio, uint32_t events) {
   bool clk = gpio_get(ENCODER_CLK);
   bool data = gpio_get(ENCODER_DATA);
   uint8_t cur = (uint8_t)((clk << 1) | data);
-
   static const int8_t trans_table[16] = {0,  -1, 1, 0, 1, 0, 0,  -1,
                                          -1, 0,  0, 1, 0, 1, -1, 0};
-
   uint8_t idx = (uint8_t)((encoder_prev_state << 2) | cur);
   int8_t delta = trans_table[idx & 0x0F];
   encoder_prev_state = cur;
-
   if (delta != 0) {
     encoder_accum += delta;
     if (encoder_accum >= ENCODER_DETENT_STEPS) {
@@ -260,15 +193,6 @@ void encoder_gpio_irq(uint gpio, uint32_t events) {
 } // namespace
 
 bool io_encoder_button_pressed() {
-  bool sw_now = gpio_get(ENCODER_SW);
-  uint64_t now_us = time_us_64();
-  if (sw_now != encoder_sw_prev &&
-      (now_us - last_encoder_sw_event_us) >= DEBOUNCE_US) {
-    encoder_sw_prev = sw_now;
-    last_encoder_sw_event_us = now_us;
-    if (!sw_now) {
-      return true;
-    }
-  }
-  return false;
+  encoder_btn.update();
+  return encoder_btn.poll_press();
 }

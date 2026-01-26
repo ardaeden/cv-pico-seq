@@ -10,6 +10,8 @@ ClockSource clock_get_source();
 void clock_set_bpm(uint32_t bpm);
 void clock_set_gate_length(uint8_t percent);
 uint8_t clock_get_gate_length();
+void clock_set_ppqn(uint32_t ppqn);
+uint32_t clock_get_ppqn();
 
 // Launch the timing core (core1) that generates ticks.
 void clock_init();

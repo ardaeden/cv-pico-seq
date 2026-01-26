@@ -475,6 +475,13 @@ void draw_scaled_text(int x, int y, const char *text, int scale) {
   }
 }
 
+void draw_centered_text(int y, const char *text, int scale) {
+  int char_w = (5 * scale) + 2;
+  int total_w = strlen(text) * char_w;
+  int x = (128 - total_w) / 2;
+  draw_scaled_text(x, y, text, scale);
+}
+
 static void draw_rect_outline(int x0, int y0, int w, int h) {
   for (int x = x0; x < x0 + w; ++x) {
     set_pixel(x, y0);
@@ -991,7 +998,7 @@ void ui_show_pattern_select(uint8_t slot) {
 }
 
 void ui_show_settings(int current_option, ClockSource clock_source,
-                      uint8_t gate_length, bool edit_mode) {
+                      uint8_t gate_length, uint32_t ppqn, bool edit_mode) {
   ssd1306_clear_fb();
   ui_draw_text(36, 0, "SETTINGS");
 
@@ -1011,7 +1018,7 @@ void ui_show_settings(int current_option, ClockSource clock_source,
   // Option 1: Gate Length
   sprintf(buf, "%sGATE LEN: ", (current_option == 1) ? ">> " : "   ");
   ui_draw_text(0, 4, buf);
-  char val_buf[8];
+  char val_buf[16];
   sprintf(val_buf, "%d%%", gate_length);
   int gate_val_x = strlen(buf) * 6;
   ui_draw_text(gate_val_x, 4, val_buf);
@@ -1019,9 +1026,108 @@ void ui_show_settings(int current_option, ClockSource clock_source,
     invert_region(gate_val_x - 1, 4 * 8 - 1, strlen(val_buf) * 6, 9);
   }
 
+  // Option 2: PPQN
+  sprintf(buf, "%sPPQN: ", (current_option == 2) ? ">> " : "   ");
+  ui_draw_text(0, 6, buf);
+  char ppqn_buf[16];
+  sprintf(ppqn_buf, "%d", ppqn);
+  int ppqn_val_x = strlen(buf) * 6;
+  ui_draw_text(ppqn_val_x, 6, ppqn_buf);
+  if (current_option == 2 && edit_mode) {
+    invert_region(ppqn_val_x - 1, 6 * 8 - 1, strlen(ppqn_buf) * 6, 9);
+  }
+
   // Firmware Version (bottom-right)
   ui_draw_text(128 - (strlen(FIRMWARE_VERSION_STR) * 6), 7,
                FIRMWARE_VERSION_STR);
 
+  ssd1306_update();
+}
+
+void ui_show_pattern_tools(int current_option) {
+  ssd1306_clear_fb();
+  ui_draw_text(24, 0, "PATTERN TOOLS");
+
+  static const char *options[] = {"RANDOM GATES", "RANDOM PITCHES",
+                                  "CLEAR GATES", "BACK"};
+  int num_options = 4;
+
+  for (int i = 0; i < num_options; i++) {
+    int y_page = 1 + i; // Start from page 1
+    if (i == current_option) {
+      ui_draw_text_inverted(10, y_page, options[i]);
+    } else {
+      ui_draw_text(10, y_page, options[i]);
+    }
+  }
+
+  ui_draw_text(10, 7, "[PRESS ENCODER]");
+  ssd1306_update();
+}
+
+void ui_show_chaos_generator(uint32_t gate_mask, uint8_t density) {
+  ssd1306_clear_fb();
+
+  // Header
+  draw_centered_text(0, "CHAOS GENERATOR", 1);
+
+  // 4x8 Grid for 32 steps
+  // Each step is a 6x6 square with 2px spacing
+  // Total width: 8*6 + 7*2 = 62px
+  // Total height: 4*6 + 3*2 = 26px
+  int start_x = (128 - 62) / 2;
+  int start_y = 12;
+
+  for (int i = 0; i < 32; i++) {
+    int col = i % 8;
+    int row = i / 8;
+    int x = start_x + col * (6 + 2);
+    int y = start_y + row * (6 + 2);
+
+    draw_rect_outline(x, y, 6, 6);
+    if (gate_mask & (1u << i)) {
+      fill_rect(x + 1, y + 1, 4, 4);
+    }
+  }
+
+  // Large Density Value
+  char buf[8];
+  sprintf(buf, "%d%%", density);
+  draw_centered_text(44, buf, 1);
+
+  // Footer
+  ui_draw_text(0, 7, "  [BACK]      [REROLL]");
+
+  ssd1306_update();
+}
+
+void ui_show_clear_gates_confirm(bool confirmed) {
+  ssd1306_clear_fb();
+  draw_centered_text(8, "CLEAR ALL GATES?", 1);
+
+  if (confirmed) {
+    draw_centered_text(30, "DONE!", 2);
+  } else {
+    draw_centered_text(30, "ARE YOU SURE?", 1);
+    ui_draw_text(0, 7, "  [CANCEL]    [YES]");
+  }
+  ssd1306_update();
+}
+void ui_show_random_pitches(int current_scale_idx, const char *scale_name) {
+  ssd1306_clear_fb();
+  draw_centered_text(0, "MELODIC CHAOS", 1);
+
+  // Focus on the mode name
+  draw_centered_text(24, scale_name, 1);
+
+  // Visual flourish: simple horizontal lines
+  fill_rect(10, 20, 108, 1);
+  fill_rect(10, 36, 108, 1);
+
+  char buf[32];
+  sprintf(buf, "MODE: %d/%d", current_scale_idx + 1, seq_get_num_scales());
+  draw_centered_text(48, buf, 1);
+
+  ui_draw_text(0, 7, "  [BACK]      [REROLL]");
   ssd1306_update();
 }

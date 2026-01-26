@@ -36,12 +36,25 @@ void ui_show_velocity_hud(uint8_t velocity);
 // Show Pattern Select Screen
 void ui_show_pattern_select(uint8_t current_slot);
 
-// Show Settings Screen
 void ui_show_settings(int current_option, ClockSource clock_source,
-                      uint8_t gate_length, bool edit_mode = false);
+                      uint8_t gate_length, uint32_t ppqn,
+                      bool edit_mode = false);
+
+// Show Pattern Tools Selection Menu
+void ui_show_pattern_tools(int current_option);
+
+// Show Chaos Generator (Performance Randomizer)
+void ui_show_chaos_generator(uint32_t gate_mask, uint8_t density);
+
+// Show Random Pitches (Melodic Chaos)
+void ui_show_random_pitches(int current_scale_idx, const char *scale_name);
+
+// Show Confirmation for Clearing Gates
+void ui_show_clear_gates_confirm(bool confirmed = false);
 
 // Low-level drawing functions for custom animations
 void clear_region(int x, int y, int w, int h);
 void draw_scaled_char(int x0, int y0, char c, int scale);
 void draw_scaled_text(int x, int y, const char *text, int scale);
+void draw_centered_text(int y, const char *text, int scale);
 void ssd1306_update();

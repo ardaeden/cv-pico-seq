@@ -3,6 +3,7 @@
 #include "eeprom.h"
 #include "pico/stdlib.h"
 #include <atomic>
+#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -378,6 +379,67 @@ void seq_load_pattern(uint8_t slot) {
     state.steps = 32;
   }
   state.current_step = (state.steps > 0) ? (state.steps - 1) : 31;
+}
+
+void seq_randomize_gates(uint8_t density_percent) {
+  for (int i = 0; i < 32; i++) {
+    bool on = (rand() % 100) < density_percent;
+    if (on) {
+      state.gate_mask |= (1u << i);
+    } else {
+      state.gate_mask &= ~(1u << i);
+    }
+  }
+}
+
+void seq_clear_gates() { state.gate_mask = 0; }
+
+struct Scale {
+  const char *name;
+  uint16_t mask; // 12 bits for 12 semitones
+};
+
+static const Scale scales[] = {
+    {"MAJOR (IONIAN)", 0b101010110101},  // W-W-H-W-W-W-H
+    {"MINOR (AEOLIAN)", 0b101101011010}, // W-H-W-W-H-W-W
+    {"DORIAN", 0b101101011011},          // W-H-W-W-W-H-W
+    {"PHRYGIAN", 0b110101011010},        // H-W-W-W-H-W-W
+    {"LYDIAN", 0b101010101101},          // W-W-W-H-W-W-H
+    {"MIXOLYDIAN", 0b110101010101},      // W-W-H-W-W-H-W
+    {"LOCRIAN", 0b110101101010},         // H-W-W-H-W-W-W
+    {"PENTATONIC MAJ", 0b101010100101},  // W-W-m3-W-m3
+    {"CHROMATIC", 0b111111111111}};
+
+static const int num_scales = sizeof(scales) / sizeof(Scale);
+
+int seq_get_num_scales() { return num_scales; }
+const char *seq_get_scale_name(int scale_idx) {
+  if (scale_idx < 0 || scale_idx >= num_scales)
+    return "NONE";
+  return scales[scale_idx].name;
+}
+
+void seq_randomize_pitches(int scale_idx, uint8_t root_note) {
+  if (scale_idx < 0 || scale_idx >= num_scales)
+    return;
+  const Scale &s = scales[scale_idx];
+
+  // Possible notes in the scale across 3 octaves
+  uint8_t scale_notes[36];
+  int count = 0;
+  for (int note = root_note; note < root_note + 36 && note < 128; note++) {
+    int rel = (note - root_note) % 12;
+    if (s.mask & (1u << (11 - rel))) {
+      scale_notes[count++] = note;
+    }
+  }
+
+  if (count == 0)
+    return;
+
+  for (int i = 0; i < 32; i++) {
+    state.notes[i] = scale_notes[rand() % count];
+  }
 }
 
 void seq_queue_pattern(uint8_t slot) {
