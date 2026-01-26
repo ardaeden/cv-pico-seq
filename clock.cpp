@@ -24,9 +24,10 @@ volatile uint32_t gate_duration_us = 2500; // Changed to 32-bit
 volatile bool clock_pin_state = false;
 
 constexpr uint CLOCK_EXT_PIN = 21;
+volatile uint32_t current_ppqn = 24;
+volatile uint32_t ticks_per_step = 6;
 volatile ClockSource current_source = CLOCK_INTERNAL;
 volatile uint8_t gate_length_percent = 50;
-
 volatile uint32_t internal_tick_count = 0;
 volatile bool step_advanced_flag = false;
 volatile uint32_t last_external_tick_us = 0; // For IRQ blanking
@@ -44,7 +45,7 @@ void handle_tick() {
   tick_flag = true;
 
   if (seq_is_playing()) {
-    if (internal_tick_count % 6 == 0) {
+    if (internal_tick_count % ticks_per_step == 0) {
       seq_advance_step();
       uint32_t step = seq_current_step();
 
@@ -100,7 +101,7 @@ void handle_tick() {
     }
 
     internal_tick_count++;
-    if (internal_tick_count >= 24)
+    if (internal_tick_count >= current_ppqn)
       internal_tick_count = 0;
   }
 }
@@ -113,6 +114,12 @@ void external_clock_callback(uint gpio, uint32_t events) {
     // 2ms Blanking period to prevent noise/bouncing triggers
     if (now - last_external_tick_us > 2000) {
       handle_tick();
+      // Daisy Chain Relay: Send pulse to next device
+      if (clock_out_enabled) {
+        gpio_put(CLOCK_OUT_PIN, false); // Active LOW: Pulse starts
+        clock_pin_state = true;
+        us_counter = 0; // Use us_counter to time the 2ms width
+      }
       last_external_tick_us = now;
     }
   }
@@ -135,8 +142,8 @@ bool timer_callback(struct repeating_timer *t) {
   }
 
   // Fixed 2ms Clock Out Pulse - Return to HIGH (Idle)
-  if (current_source == CLOCK_INTERNAL && clock_pin_state &&
-      us_counter >= 2000) {
+  // Works for both Internal Master and External Slave (Relay)
+  if (clock_pin_state && us_counter >= 2000) {
     gpio_put(CLOCK_OUT_PIN, true); // Active LOW: Return to Idle
     clock_pin_state = false;
   }
@@ -191,10 +198,21 @@ bool clock_consume_step() {
 
 void clock_set_bpm(uint32_t bpm) {
   uint32_t us_per_quarter = 60000000UL / (bpm ? bpm : 120);
-  clock_interval_us = us_per_quarter / 24;
+  clock_interval_us = us_per_quarter / current_ppqn;
   // recalculate gate duration based on current gate length
-  gate_duration_us = (clock_interval_us * 6 * gate_length_percent / 100);
+  gate_duration_us =
+      (clock_interval_us * (current_ppqn / 4) * gate_length_percent / 100);
 }
+
+void clock_set_ppqn(uint32_t ppqn) {
+  if (ppqn < 4)
+    ppqn = 4;
+  current_ppqn = ppqn;
+  ticks_per_step = ppqn / 4;
+  clock_set_bpm(seq_get_bpm()); // Full recalculation
+}
+
+uint32_t clock_get_ppqn() { return current_ppqn; }
 
 void clock_set_gate_length(uint8_t percent) {
   if (percent > 100)

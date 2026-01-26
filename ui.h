@@ -38,7 +38,8 @@ void ui_show_pattern_select(uint8_t current_slot);
 
 // Show Settings Screen
 void ui_show_settings(int current_option, ClockSource clock_source,
-                      uint8_t gate_length, bool edit_mode = false);
+                      uint8_t gate_length, uint32_t ppqn,
+                      bool edit_mode = false);
 
 // Low-level drawing functions for custom animations
 void clear_region(int x, int y, int w, int h);

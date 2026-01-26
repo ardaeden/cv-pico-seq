@@ -990,7 +990,7 @@ void ui_show_pattern_select(uint8_t slot) {
 }
 
 void ui_show_settings(int current_option, ClockSource clock_source,
-                      uint8_t gate_length, bool edit_mode) {
+                      uint8_t gate_length, uint32_t ppqn, bool edit_mode) {
   ssd1306_clear_fb();
   ui_draw_text(36, 0, "SETTINGS");
 
@@ -1010,12 +1010,23 @@ void ui_show_settings(int current_option, ClockSource clock_source,
   // Option 1: Gate Length
   sprintf(buf, "%sGATE LEN: ", (current_option == 1) ? ">> " : "   ");
   ui_draw_text(0, 4, buf);
-  char val_buf[8];
+  char val_buf[16];
   sprintf(val_buf, "%d%%", gate_length);
   int gate_val_x = strlen(buf) * 6;
   ui_draw_text(gate_val_x, 4, val_buf);
   if (current_option == 1 && edit_mode) {
     invert_region(gate_val_x - 1, 4 * 8 - 1, strlen(val_buf) * 6, 9);
+  }
+
+  // Option 2: PPQN
+  sprintf(buf, "%sPPQN: ", (current_option == 2) ? ">> " : "   ");
+  ui_draw_text(0, 6, buf);
+  char ppqn_buf[16];
+  sprintf(ppqn_buf, "%d", ppqn);
+  int ppqn_val_x = strlen(buf) * 6;
+  ui_draw_text(ppqn_val_x, 6, ppqn_buf);
+  if (current_option == 2 && edit_mode) {
+    invert_region(ppqn_val_x - 1, 6 * 8 - 1, strlen(ppqn_buf) * 6, 9);
   }
 
   // Firmware Version (bottom-right)
