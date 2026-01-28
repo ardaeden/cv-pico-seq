@@ -27,16 +27,6 @@ bool io_poll_stop_button();
 // Returns true when step button (GP8) is currently pressed (held down).
 bool io_is_step_button_pressed();
 
-// Returns true when save button (GP12) is currently pressed (held down).
-bool io_is_save_button_pressed();
-
-// Returns true when pattern select button (GP11) is currently pressed (held
-// down).
-bool io_is_pattern_select_button_pressed();
-
-// Returns true when step button (GP8) was pressed (debounced, edge-triggered).
-bool io_poll_step_button();
-
 // Start LED blink (non-blocking)
 void io_blink_led_start();
 

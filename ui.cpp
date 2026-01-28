@@ -373,7 +373,8 @@ void ui_clear() {
 }
 
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
-                 TransportState tstate, bool blink_slot, bool bpm_inverted) {
+                 TransportState tstate, bool blink_slot, bool bpm_inverted,
+                 uint32_t current_step, uint32_t total_steps) {
   // Clear only the top page for BPM (1 page height, full width)
   for (int i = 0; i < 128; ++i) {
     fb[0 * 128 + i] = 0x00;
@@ -420,6 +421,17 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
     snprintf(slot_buf, sizeof(slot_buf), "P:%d", pattern_slot);
     int slot_x = 128 - (strlen(slot_buf) * 6); // Right align
     ui_draw_text(slot_x, 0, slot_buf);
+  }
+
+  // Draw step counter (e.g., "01/16") to the left of pattern slot
+  if (current_step != 0xFFFFFFFF) {
+    char step_buf[8];
+    snprintf(step_buf, sizeof(step_buf), "%02u/%02u",
+             (unsigned)(current_step + 1), (unsigned)total_steps);
+    int step_width = strlen(step_buf) * 6;
+    int slot_width = 4 * 6; // "P:X" width (always reserve space)
+    int step_x = 128 - slot_width - step_width - 6; // 6px gap from slot
+    ui_draw_text(step_x, 0, step_buf);
   }
 
   ssd1306_update();
@@ -549,6 +561,7 @@ static void fill_rect_dither(int x0, int y0, int w, int h) {
   }
 }
 
+// Display 32-step grid (current_step in [0..steps-1]).
 void ui_show_steps(uint32_t current_step, uint32_t steps) {
   if (steps == 0)
     return;
@@ -587,7 +600,8 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
     int y = start_y + row * (sq_h + spacing_y);
 
     bool is_active = (i < (int)steps);
-    bool is_current = (i == (int)current_step);
+    // Use 0xFFFFFFFF as special value to indicate "no pointer"
+    bool is_current = (current_step != 0xFFFFFFFF) && (i == (int)current_step);
     bool gate_enabled = seq_get_gate_enabled(i);
     bool tied = seq_get_tie(i);
     bool prev_tied = (i > 0 && (i % 8 != 0) && seq_get_tie(i - 1));
@@ -965,18 +979,6 @@ void ui_show_edit_note(uint32_t step, uint8_t note, uint8_t velocity,
   ui_edit_note_prev_velocity = velocity;
   ui_edit_note_prev_mode = current_mode;
 
-  ssd1306_update();
-}
-
-void ui_show_velocity_hud(uint8_t velocity) {
-  // HUD at Page 1 (between header and info) to avoid grid/note clashes
-  int x0 = 0, y0 = 10, w = 128, h = 8;
-  clear_region(x0, y0, w, h);
-  char buf[32];
-  sprintf(buf, "VELO: %s", velo_names[velocity > 4 ? 4 : velocity]);
-  // Center the text
-  int tx = (128 - (strlen(buf) * 6)) / 2;
-  ui_draw_text(tx, 1, buf);
   ssd1306_update();
 }
 

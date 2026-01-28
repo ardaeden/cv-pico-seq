@@ -110,22 +110,9 @@ bool io_poll_stop_button() {
   stop_btn.update();
   return stop_btn.poll_press();
 }
-bool io_poll_step_button() {
-  step_btn.update();
-  return step_btn.poll_press();
-}
-
 bool io_is_step_button_pressed() {
   step_btn.update();
   return step_btn.is_pressed();
-}
-bool io_is_save_button_pressed() {
-  save_btn.update();
-  return save_btn.is_pressed();
-}
-bool io_is_pattern_select_button_pressed() {
-  pattern_btn.update();
-  return pattern_btn.is_pressed();
 }
 
 void io_blink_led_start() {

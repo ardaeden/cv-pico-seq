@@ -220,7 +220,8 @@ void clock_set_gate_length(uint8_t percent) {
     percent = 100;
   gate_length_percent = percent;
   // recalculate with current clock_interval_us
-  gate_duration_us = (uint64_t)clock_interval_us * 6 * percent / 100;
+  gate_duration_us =
+      (uint64_t)clock_interval_us * (current_ppqn / 4) * percent / 100;
 }
 
 uint8_t clock_get_gate_length() { return gate_length_percent; }
@@ -251,13 +252,6 @@ void clock_init() {
 void clock_launch_core1() {
   // We'll setup the GPIO interrupt on the core that will handle it (Core 1)
   multicore_launch_core1(core1_main);
-}
-
-bool clock_consume_tick() {
-  if (!tick_flag)
-    return false;
-  tick_flag = false;
-  return true;
 }
 
 void clock_gate_enable(bool enable) { gate_enabled = enable; }

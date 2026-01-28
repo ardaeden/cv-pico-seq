@@ -18,9 +18,10 @@ void ui_clear();
 // Immediately update displayed BPM value and pattern slot (non-blocking)
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
                  TransportState tstate = TSTATE_STOP, bool blink_slot = false,
-                 bool bpm_inverted = false);
+                 bool bpm_inverted = false, uint32_t current_step = 0xFFFFFFFF,
+                 uint32_t total_steps = 32);
 
-// Display 16-step grid (current_step in [0..steps-1]).
+// Display 32-step grid (current_step in [0..steps-1]).
 // Shows 8 squares on top row and 8 on bottom; fills the current step square.
 void ui_show_steps(uint32_t current_step, uint32_t steps);
 
@@ -30,9 +31,6 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note);
 // Display edit mode: note/velocity editing
 void ui_show_edit_note(uint32_t step, uint8_t note, uint8_t velocity,
                        bool edit_velocity = false);
-
-// HUD for quick adjustments
-void ui_show_velocity_hud(uint8_t velocity);
 
 // Show Pattern Select Screen
 void ui_show_pattern_select(uint8_t current_slot);
@@ -44,12 +42,6 @@ void ui_show_settings(int current_option, ClockSource clock_source,
 // Show Pattern Tools Selection Menu (Dashboard Cards)
 void ui_show_pattern_tools(int current_option, bool edit_mode = false,
                            uint8_t density = 50);
-
-// Show Chaos Generator (Performance Randomizer)
-void ui_show_chaos_generator(uint32_t gate_mask, uint8_t density);
-
-// Show Confirmation for Clearing Gates
-void ui_show_clear_gates_confirm(bool confirmed = false);
 
 // Low-level drawing functions for custom animations
 void clear_region(int x, int y, int w, int h);
