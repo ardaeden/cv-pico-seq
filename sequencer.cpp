@@ -28,6 +28,7 @@ struct SequencerState {
   uint32_t gate_mask;
   uint32_t tie_mask;
   std::atomic<int> global_scale_idx;
+  PatternLoadMode load_mode;
 };
 
 static SequencerState state = {120,
@@ -53,6 +54,7 @@ void seq_init() {
   }
   state.tie_mask = 0;
   state.global_scale_idx.store(8); // CHROMATIC
+  state.load_mode = LOAD_WAIT_END;
 }
 
 bool seq_toggle_play() {
@@ -68,6 +70,8 @@ void seq_stop() {
 }
 
 bool seq_is_playing() { return state.playing.load(); }
+
+void seq_set_playing(bool p) { state.playing.store(p); }
 
 void seq_advance_step() {
   uint32_t prev_step = state.current_step;
@@ -517,3 +521,7 @@ uint8_t seq_quantize_note(uint8_t note) {
 }
 
 int8_t seq_get_pending_pattern() { return pending_pattern_slot; }
+
+PatternLoadMode seq_get_load_mode() { return state.load_mode; }
+
+void seq_set_load_mode(PatternLoadMode mode) { state.load_mode = mode; }

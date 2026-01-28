@@ -74,7 +74,8 @@ static const uint8_t font5x7[][5] = {
     {0x38, 0x44, 0x44, 0x44, 0x38},                                 // 44: o
     {0x7C, 0x14, 0x14, 0x14, 0x08},                                 // 45: p
     {0x7C, 0x04, 0x18, 0x04, 0x78},                                 // 46: m
-    {0x08, 0x7E, 0x09, 0x01, 0x02}                                  // 47: f
+    {0x08, 0x7E, 0x09, 0x01, 0x02},                                 // 47: f
+    {0x23, 0x13, 0x08, 0x64, 0x62}                                  // 48: %
 };
 
 static int char_to_font_index(char c) {
@@ -108,6 +109,8 @@ static int char_to_font_index(char c) {
     return 40;
   if (c == '<')
     return 41;
+  if (c == '%')
+    return 48;
   return 0;
 }
 
@@ -998,7 +1001,8 @@ void ui_show_pattern_select(uint8_t slot) {
 }
 
 void ui_show_settings(int current_option, ClockSource clock_source,
-                      uint8_t gate_length, uint32_t ppqn, bool edit_mode) {
+                      uint8_t gate_length, uint32_t ppqn,
+                      PatternLoadMode load_mode, bool edit_mode) {
   ssd1306_clear_fb();
   ui_draw_text(36, 0, "SETTINGS");
 
@@ -1035,6 +1039,15 @@ void ui_show_settings(int current_option, ClockSource clock_source,
   ui_draw_text(ppqn_val_x, 6, ppqn_buf);
   if (current_option == 2 && edit_mode) {
     invert_region(ppqn_val_x - 1, 6 * 8 - 1, strlen(ppqn_buf) * 6, 9);
+  }
+  // Option 3: Pattern Load Mode
+  const char *load_str = (load_mode == LOAD_INSTANT) ? "INST" : "WAIT";
+  sprintf(buf, "%sLOAD: ", (current_option == 3) ? ">> " : "   ");
+  ui_draw_text(0, 6, buf);
+  int load_val_x = strlen(buf) * 6;
+  ui_draw_text(load_val_x, 6, load_str);
+  if (current_option == 3 && edit_mode) {
+    invert_region(load_val_x - 1, 6 * 8 - 1, strlen(load_str) * 6, 9);
   }
 
   // Firmware Version (bottom-right)
@@ -1086,25 +1099,27 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
     }
 
   } else if (current_option == 1) { // RANDOM GATES CARD
-    draw_centered_text(2, "CHAOS GATES", 1);
+    draw_scaled_text(0, 2, "CHAOS GATES", 1);
     uint32_t mask = seq_get_gate_mask();
 
-    int gx = 32, gy = 18;
+    char den_buf[8];
+    sprintf(den_buf, "%%%d", density);
+    int den_tx = 128 - (strlen(den_buf) * 7);
+    draw_scaled_text(den_tx, 2, den_buf, 1);
+    if (edit_mode)
+      invert_region(den_tx - 1, 1, (strlen(den_buf) * 7) + 1, 9);
+
+    // Larger boxes (9x6) and centered grid
+    int gx = 20, gy = 20;
     for (int i = 0; i < 32; i++) {
       int row = i / 8;
       int col = i % 8;
       if (mask & (1u << i)) {
-        fill_rect(gx + col * 8, gy + row * 6, 6, 4);
+        fill_rect(gx + col * 11, gy + row * 8, 9, 6);
       } else {
-        draw_rect_outline(gx + col * 8, gy + row * 6, 6, 4);
+        draw_rect_outline(gx + col * 11, gy + row * 8, 9, 6);
       }
     }
-
-    char buf[16];
-    sprintf(buf, "DENSITY: %d%%", density);
-    draw_centered_text(45, buf, 1);
-    if (edit_mode)
-      invert_region(0, 44, 128, 10);
 
   } else if (current_option == 2) { // CLEAR CARD
     draw_centered_text(2, "RESET PATTERN", 1);

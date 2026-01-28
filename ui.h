@@ -1,6 +1,7 @@
 #pragma once
 
 #include "clock.h"
+#include "sequencer.h"
 #include <cstdint>
 
 enum TransportState { TSTATE_STOP, TSTATE_PLAY, TSTATE_PAUSE };
@@ -38,7 +39,7 @@ void ui_show_pattern_select(uint8_t current_slot);
 
 void ui_show_settings(int current_option, ClockSource clock_source,
                       uint8_t gate_length, uint32_t ppqn,
-                      bool edit_mode = false);
+                      PatternLoadMode load_mode, bool edit_mode = false);
 
 // Show Pattern Tools Selection Menu (Dashboard Cards)
 void ui_show_pattern_tools(int current_option, bool edit_mode = false,

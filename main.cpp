@@ -45,7 +45,7 @@ int main() {
   uint8_t temp_pattern_slot = 0;
   int settings_option = 0;
   bool settings_edit_mode = false;
-  const int NUM_SETTINGS = 3;
+  const int NUM_SETTINGS = 4;
 
   int tools_selection = 0;
   bool tools_edit_mode = false;
@@ -84,11 +84,13 @@ int main() {
     // --- TRANSPORT CONTROLS ---
     if (io_poll_play_toggle()) {
       bool was_playing = seq_is_playing();
-      bool is_playing = seq_toggle_play();
-      if (is_playing) {
+      if (!was_playing) {
+        // Start or Resume
+        seq_set_playing(true);
         clock_gate_enable(true);
         clock_out_enable(true);
         clock_restart();
+
         if (seq_current_step() % 4 == 0)
           io_blink_led_start();
         if (edit_mode == EDIT_NONE) {
@@ -99,6 +101,8 @@ int main() {
                       encoder_step == 10);
         }
       } else {
+        // Pause
+        seq_set_playing(false);
         clock_gate_enable(false);
         clock_out_enable(false);
         current_tstate = TSTATE_PAUSE;
@@ -213,7 +217,7 @@ int main() {
         settings_edit_mode = false;
         ui_show_settings(settings_option, clock_get_source(),
                          clock_get_gate_length(), clock_get_ppqn(),
-                         settings_edit_mode);
+                         seq_get_load_mode(), settings_edit_mode);
       }
     }
 
@@ -233,7 +237,7 @@ int main() {
         ui_show_edit_note(edit_step, seq_get_note(edit_step),
                           seq_get_velocity(edit_step), false);
       } else if (edit_mode == PATTERN_SELECT) {
-        if (seq_is_playing())
+        if (seq_get_load_mode() == LOAD_WAIT_END && seq_is_playing())
           seq_queue_pattern(temp_pattern_slot);
         else
           seq_load_pattern(temp_pattern_slot);
@@ -249,12 +253,13 @@ int main() {
           clock_set_source(clock_get_source() == CLOCK_INTERNAL
                                ? CLOCK_EXTERNAL
                                : CLOCK_INTERNAL);
-        } else if (settings_option == 1 || settings_option == 2) {
+        } else if (settings_option == 1 || settings_option == 2 ||
+                   settings_option == 3) {
           settings_edit_mode = !settings_edit_mode;
         }
         ui_show_settings(settings_option, clock_get_source(),
                          clock_get_gate_length(), clock_get_ppqn(),
-                         settings_edit_mode);
+                         seq_get_load_mode(), settings_edit_mode);
       } else if (edit_mode == PATTERN_TOOLS) {
         if (tools_selection == 1) { // Chaos Gates Card
           tools_edit_mode = !tools_edit_mode;
@@ -347,11 +352,15 @@ int main() {
             if (idx > 5)
               idx = 5;
             clock_set_ppqn(ppqns[idx]);
+          } else if (settings_option == 3) {
+            PatternLoadMode mode = seq_get_load_mode();
+            mode = (mode == LOAD_INSTANT) ? LOAD_WAIT_END : LOAD_INSTANT;
+            seq_set_load_mode(mode);
           }
         }
         ui_show_settings(settings_option, clock_get_source(),
                          clock_get_gate_length(), clock_get_ppqn(),
-                         settings_edit_mode);
+                         seq_get_load_mode(), settings_edit_mode);
       } else if (edit_mode == PATTERN_TOOLS) {
         if (tools_edit_mode) {
           if (tools_selection == 0) { // Scale

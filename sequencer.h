@@ -2,12 +2,15 @@
 
 #include <cstdint>
 
+enum PatternLoadMode { LOAD_INSTANT, LOAD_WAIT_END };
+
 void seq_init();
 
 // Play state helpers
 bool seq_toggle_play();
 void seq_stop();
 bool seq_is_playing();
+void seq_set_playing(bool playing);
 
 // Step operations
 void seq_advance_step();
@@ -58,3 +61,6 @@ const char *seq_get_scale_name(int scale_idx);
 void seq_queue_pattern(uint8_t slot);
 int8_t seq_get_pending_pattern();
 void seq_init_flash();
+
+PatternLoadMode seq_get_load_mode();
+void seq_set_load_mode(PatternLoadMode mode);
