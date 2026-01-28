@@ -40,14 +40,12 @@ void ui_show_settings(int current_option, ClockSource clock_source,
                       uint8_t gate_length, uint32_t ppqn,
                       bool edit_mode = false);
 
-// Show Pattern Tools Selection Menu
-void ui_show_pattern_tools(int current_option);
+// Show Pattern Tools Selection Menu (Dashboard Cards)
+void ui_show_pattern_tools(int current_option, bool edit_mode = false,
+                           uint8_t density = 50);
 
 // Show Chaos Generator (Performance Randomizer)
 void ui_show_chaos_generator(uint32_t gate_mask, uint8_t density);
-
-// Show Random Pitches (Melodic Chaos)
-void ui_show_random_pitches(int current_scale_idx, const char *scale_name);
 
 // Show Confirmation for Clearing Gates
 void ui_show_clear_gates_confirm(bool confirmed = false);

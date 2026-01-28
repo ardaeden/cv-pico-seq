@@ -1044,90 +1044,80 @@ void ui_show_settings(int current_option, ClockSource clock_source,
   ssd1306_update();
 }
 
-void ui_show_pattern_tools(int current_option) {
-  ssd1306_clear_fb();
-  ui_draw_text(24, 0, "PATTERN TOOLS");
-
-  static const char *options[] = {"RANDOM GATES", "RANDOM PITCHES",
-                                  "CLEAR GATES", "BACK"};
-  int num_options = 4;
-
-  for (int i = 0; i < num_options; i++) {
-    int y_page = 1 + i; // Start from page 1
-    if (i == current_option) {
-      ui_draw_text_inverted(10, y_page, options[i]);
+static void draw_page_indicator(int count, int selected) {
+  int dot_w = 4;
+  int spacing = 6;
+  int total_w = (count * dot_w) + ((count - 1) * spacing);
+  int x0 = (128 - total_w) / 2;
+  int y = 60;
+  for (int i = 0; i < count; i++) {
+    int x = x0 + i * (dot_w + spacing);
+    if (i == selected) {
+      fill_rect(x, y, dot_w, dot_w);
     } else {
-      ui_draw_text(10, y_page, options[i]);
+      draw_rect_outline(x, y, dot_w, dot_w);
+    }
+  }
+}
+
+void ui_show_pattern_tools(int current_option, bool edit_mode,
+                           uint8_t density) {
+  ssd1306_clear_fb();
+
+  // Page Indicators at the bottom - 3 cards now
+  draw_page_indicator(3, current_option);
+
+  if (current_option == 0) { // SCALE CARD
+    draw_centered_text(2, "GLOBAL SCALE", 1);
+    const char *scale_name = seq_get_scale_name(seq_get_global_scale());
+
+    draw_rect_outline(5, 20, 118, 24);
+    int font_scale = 1;
+    int char_w = (5 * font_scale) + 2;
+    int total_w = strlen(scale_name) * char_w;
+    int tx = (128 - total_w) / 2;
+    int ty = 28;
+
+    if (edit_mode) {
+      draw_scaled_text(tx, ty, scale_name, font_scale);
+      invert_region(7, 22, 114, 20);
+    } else {
+      draw_scaled_text(tx, ty, scale_name, font_scale);
+    }
+
+  } else if (current_option == 1) { // RANDOM GATES CARD
+    draw_centered_text(2, "CHAOS GATES", 1);
+    uint32_t mask = seq_get_gate_mask();
+
+    int gx = 32, gy = 18;
+    for (int i = 0; i < 32; i++) {
+      int row = i / 8;
+      int col = i % 8;
+      if (mask & (1u << i)) {
+        fill_rect(gx + col * 8, gy + row * 6, 6, 4);
+      } else {
+        draw_rect_outline(gx + col * 8, gy + row * 6, 6, 4);
+      }
+    }
+
+    char buf[16];
+    sprintf(buf, "DENSITY: %d%%", density);
+    draw_centered_text(45, buf, 1);
+    if (edit_mode)
+      invert_region(0, 44, 128, 10);
+
+  } else if (current_option == 2) { // CLEAR CARD
+    draw_centered_text(2, "RESET PATTERN", 1);
+    draw_rect_outline(54, 15, 20, 20);
+    draw_scaled_text(60, 18, "!", 2);
+
+    if (edit_mode) {
+      draw_centered_text(45, "CONFIRM CLEAR?", 1);
+      invert_region(0, 44, 128, 10);
+    } else {
+      draw_centered_text(45, "DANGER ZONE", 1);
     }
   }
 
-  ui_draw_text(10, 7, "[PRESS ENCODER]");
-  ssd1306_update();
-}
-
-void ui_show_chaos_generator(uint32_t gate_mask, uint8_t density) {
-  ssd1306_clear_fb();
-
-  // Header
-  draw_centered_text(0, "CHAOS GENERATOR", 1);
-
-  // 4x8 Grid for 32 steps
-  // Each step is a 6x6 square with 2px spacing
-  // Total width: 8*6 + 7*2 = 62px
-  // Total height: 4*6 + 3*2 = 26px
-  int start_x = (128 - 62) / 2;
-  int start_y = 12;
-
-  for (int i = 0; i < 32; i++) {
-    int col = i % 8;
-    int row = i / 8;
-    int x = start_x + col * (6 + 2);
-    int y = start_y + row * (6 + 2);
-
-    draw_rect_outline(x, y, 6, 6);
-    if (gate_mask & (1u << i)) {
-      fill_rect(x + 1, y + 1, 4, 4);
-    }
-  }
-
-  // Large Density Value
-  char buf[8];
-  sprintf(buf, "%d%%", density);
-  draw_centered_text(44, buf, 1);
-
-  // Footer
-  ui_draw_text(0, 7, "  [BACK]      [REROLL]");
-
-  ssd1306_update();
-}
-
-void ui_show_clear_gates_confirm(bool confirmed) {
-  ssd1306_clear_fb();
-  draw_centered_text(8, "CLEAR ALL GATES?", 1);
-
-  if (confirmed) {
-    draw_centered_text(30, "DONE!", 2);
-  } else {
-    draw_centered_text(30, "ARE YOU SURE?", 1);
-    ui_draw_text(0, 7, "  [CANCEL]    [YES]");
-  }
-  ssd1306_update();
-}
-void ui_show_random_pitches(int current_scale_idx, const char *scale_name) {
-  ssd1306_clear_fb();
-  draw_centered_text(0, "MELODIC CHAOS", 1);
-
-  // Focus on the mode name
-  draw_centered_text(24, scale_name, 1);
-
-  // Visual flourish: simple horizontal lines
-  fill_rect(10, 20, 108, 1);
-  fill_rect(10, 36, 108, 1);
-
-  char buf[32];
-  sprintf(buf, "MODE: %d/%d", current_scale_idx + 1, seq_get_num_scales());
-  draw_centered_text(48, buf, 1);
-
-  ui_draw_text(0, 7, "  [BACK]      [REROLL]");
   ssd1306_update();
 }

@@ -27,6 +27,7 @@ struct SequencerState {
   uint8_t velocities[32]; // 0:pp, 1:p, 2:mf, 3:f, 4:ff
   uint32_t gate_mask;
   uint32_t tie_mask;
+  std::atomic<int> global_scale_idx;
 };
 
 static SequencerState state = {120,
@@ -51,6 +52,7 @@ void seq_init() {
     state.velocities[i] = 2; // mf
   }
   state.tie_mask = 0;
+  state.global_scale_idx.store(8); // CHROMATIC
 }
 
 bool seq_toggle_play() {
@@ -400,14 +402,14 @@ struct Scale {
 };
 
 static const Scale scales[] = {
-    {"MAJOR (IONIAN)", 0b101010110101},  // W-W-H-W-W-W-H
-    {"MINOR (AEOLIAN)", 0b101101011010}, // W-H-W-W-H-W-W
-    {"DORIAN", 0b101101011011},          // W-H-W-W-W-H-W
-    {"PHRYGIAN", 0b110101011010},        // H-W-W-W-H-W-W
-    {"LYDIAN", 0b101010101101},          // W-W-W-H-W-W-H
-    {"MIXOLYDIAN", 0b110101010101},      // W-W-H-W-W-H-W
-    {"LOCRIAN", 0b110101101010},         // H-W-W-H-W-W-W
-    {"PENTATONIC MAJ", 0b101010100101},  // W-W-m3-W-m3
+    {"MAJOR (IONIAN)", 0b101011010101},  // C D E F G A B
+    {"MINOR (AEOLIAN)", 0b101101011010}, // C D Eb F G Ab Bb
+    {"DORIAN", 0b101101010110},          // C D Eb F G A Bb
+    {"PHRYGIAN", 0b110101011010},        // C Db Eb F G Ab Bb
+    {"LYDIAN", 0b101010110101},          // C D E F# G A B
+    {"MIXOLYDIAN", 0b101011010110},      // C D E F G A Bb
+    {"LOCRIAN", 0b110101101010},         // C Db Eb F Gb Ab Bb
+    {"BLUES", 0b100101110010},           // C Eb F Gb G Bb
     {"CHROMATIC", 0b111111111111}};
 
 static const int num_scales = sizeof(scales) / sizeof(Scale);
@@ -419,33 +421,99 @@ const char *seq_get_scale_name(int scale_idx) {
   return scales[scale_idx].name;
 }
 
-void seq_randomize_pitches(int scale_idx, uint8_t root_note) {
-  if (scale_idx < 0 || scale_idx >= num_scales)
-    return;
-  const Scale &s = scales[scale_idx];
-
-  // Possible notes in the scale across 3 octaves
-  uint8_t scale_notes[36];
-  int count = 0;
-  for (int note = root_note; note < root_note + 36 && note < 128; note++) {
-    int rel = (note - root_note) % 12;
-    if (s.mask & (1u << (11 - rel))) {
-      scale_notes[count++] = note;
-    }
-  }
-
-  if (count == 0)
-    return;
-
-  for (int i = 0; i < 32; i++) {
-    state.notes[i] = scale_notes[rand() % count];
-  }
-}
-
 void seq_queue_pattern(uint8_t slot) {
   if (slot >= NUM_PATTERN_SLOTS)
     return;
   pending_pattern_slot = slot;
+}
+
+int seq_get_global_scale() { return state.global_scale_idx.load(); }
+
+void seq_set_global_scale(int scale_idx) {
+  if (scale_idx >= 0 && scale_idx < num_scales) {
+    state.global_scale_idx.store(scale_idx);
+  }
+}
+
+uint8_t seq_get_next_note_in_scale(uint8_t current_note, int delta) {
+  int scale_idx = state.global_scale_idx.load();
+  if (scale_idx < 0 || scale_idx >= num_scales)
+    return current_note;
+
+  const Scale &s = scales[scale_idx];
+  if (s.mask == 0b111111111111) { // Chromatic shortcut
+    int n = (int)current_note + delta;
+    if (n < 36)
+      n = 36;
+    if (n > 84)
+      n = 84;
+    return (uint8_t)n;
+  }
+
+  int dir = (delta > 0) ? 1 : -1;
+  int abs_delta = (delta > 0) ? delta : -delta;
+  uint8_t note = current_note;
+  uint8_t root = 0;
+
+  for (int i = 0; i < abs_delta; i++) {
+    while (true) {
+      if (dir > 0) {
+        if (note >= 84)
+          break;
+        note++;
+      } else {
+        if (note <= 36)
+          break;
+        note--;
+      }
+      int rel = (note - root) % 12;
+      if (s.mask & (1u << (11 - rel))) {
+        break; // Found a note in scale
+      }
+    }
+  }
+  return note;
+}
+
+uint8_t seq_quantize_note(uint8_t note) {
+  // Clamp to operative range
+  uint8_t clamped = note;
+  if (clamped < 36)
+    clamped = 36;
+  if (clamped > 84)
+    clamped = 84;
+
+  int scale_idx = state.global_scale_idx.load();
+  if (scale_idx < 0 || scale_idx >= num_scales)
+    return clamped;
+
+  const Scale &s = scales[scale_idx];
+  if (s.mask == 0b111111111111) { // Chromatic shortcut
+    return clamped;
+  }
+
+  // Find nearest note in scale (rounding down)
+  uint8_t root = 0;
+  uint8_t current = clamped;
+
+  while (current >= 36) {
+    int rel = (current - root) % 12;
+    if (s.mask & (1u << (11 - rel))) {
+      return current;
+    }
+    current--;
+  }
+
+  // No note found downwards? Look upwards from range floor
+  current = 36;
+  while (current <= 84) {
+    int rel = (current - root) % 12;
+    if (s.mask & (1u << (11 - rel))) {
+      return current;
+    }
+    current++;
+  }
+  return clamped;
 }
 
 int8_t seq_get_pending_pattern() { return pending_pattern_slot; }

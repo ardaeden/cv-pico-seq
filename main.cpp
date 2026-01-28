@@ -48,9 +48,10 @@ int main() {
   const int NUM_SETTINGS = 3;
 
   int tools_selection = 0;
+  bool tools_edit_mode = false;
   uint8_t temp_density = 50;
-  int temp_scale_idx = 0;
   bool clear_confirmed = false;
+  bool tools_reroll_flash = false;
 
   bool blink_active = false;
   uint64_t blink_start_time = 0;
@@ -134,7 +135,8 @@ int main() {
         edit_long_press_triggered = true;
         edit_mode = PATTERN_TOOLS;
         tools_selection = 0;
-        ui_show_pattern_tools(tools_selection);
+        tools_edit_mode = false;
+        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density);
       }
     } else if (!edit_now && edit_button_down) {
       // Button Released
@@ -254,44 +256,21 @@ int main() {
                          clock_get_gate_length(), clock_get_ppqn(),
                          settings_edit_mode);
       } else if (edit_mode == PATTERN_TOOLS) {
-        if (tools_selection == 0) { // Random Gates
-          edit_mode = TOOLS_RANDOM_GATES;
-          temp_density = 50;
-          seq_randomize_gates(temp_density);
-          ui_show_chaos_generator(seq_get_gate_mask(), temp_density);
-        } else if (tools_selection == 1) { // Random Pitches
-          edit_mode = TOOLS_RANDOM_PITCHES;
-          temp_scale_idx = 0;
-          seq_randomize_pitches(temp_scale_idx);
-          ui_show_random_pitches(temp_scale_idx,
-                                 seq_get_scale_name(temp_scale_idx));
-        } else if (tools_selection == 2) { // Clear
-          edit_mode = TOOLS_CLEAR;
-          clear_confirmed = false;
-          ui_show_clear_gates_confirm(clear_confirmed);
-        } else { // Back
-          edit_mode = EDIT_NONE;
-          ui_clear();
-          ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                      current_tstate, false, encoder_step == 10);
-          ui_show_steps(seq_current_step(), seq_get_steps());
+        if (tools_selection == 1) { // Chaos Gates Card
+          tools_edit_mode = !tools_edit_mode;
+        } else if (tools_selection == 2) { // CLEAR Card
+          if (!tools_edit_mode) {
+            tools_edit_mode = true;
+            clear_confirmed = false;
+          } else {
+            seq_clear_gates();
+            clear_confirmed = true;
+            tools_edit_mode = false;
+          }
+        } else {
+          tools_edit_mode = !tools_edit_mode;
         }
-      } else if (edit_mode == TOOLS_RANDOM_GATES) {
-        seq_randomize_gates(temp_density);
-        ui_show_chaos_generator(seq_get_gate_mask(), temp_density);
-      } else if (edit_mode == TOOLS_RANDOM_PITCHES) {
-        seq_randomize_pitches(temp_scale_idx);
-        ui_show_random_pitches(temp_scale_idx,
-                               seq_get_scale_name(temp_scale_idx));
-      } else if (edit_mode == TOOLS_CLEAR) {
-        seq_clear_gates();
-        clear_confirmed = true;
-        ui_show_clear_gates_confirm(clear_confirmed);
-        edit_mode = EDIT_NONE;
-        ui_clear();
-        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, false, encoder_step == 10);
-        ui_show_steps(seq_current_step(), seq_get_steps());
+        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density);
       } else if (edit_mode == EDIT_NONE) {
         encoder_step = (encoder_step == 1) ? 10 : 1;
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
@@ -319,13 +298,10 @@ int main() {
           ui_show_edit_step(edit_step, seq_get_note(edit_step));
         }
       } else if (edit_mode == EDIT_NOTE) {
-        int nn = (int)seq_get_note(edit_step) + encoder_delta;
-        if (nn < 36)
-          nn = 36;
-        if (nn > 84)
-          nn = 84;
-        seq_set_note(edit_step, (uint8_t)nn);
-        ui_show_edit_note(edit_step, (uint8_t)nn, seq_get_velocity(edit_step));
+        uint8_t curr = seq_get_note(edit_step);
+        uint8_t next = seq_get_next_note_in_scale(curr, encoder_delta);
+        seq_set_note(edit_step, next);
+        ui_show_edit_note(edit_step, next, seq_get_velocity(edit_step));
       } else if (edit_mode == EDIT_VELOCITY) {
         int nv = (int)seq_get_velocity(edit_step) + encoder_delta;
         if (nv < 0)
@@ -377,31 +353,32 @@ int main() {
                          clock_get_gate_length(), clock_get_ppqn(),
                          settings_edit_mode);
       } else if (edit_mode == PATTERN_TOOLS) {
-        tools_selection += encoder_delta;
-        if (tools_selection < 0)
-          tools_selection = 3; // 4 options
-        if (tools_selection > 3)
-          tools_selection = 0;
-        ui_show_pattern_tools(tools_selection);
-      } else if (edit_mode == TOOLS_RANDOM_GATES) {
-        int d = (int)temp_density + encoder_delta * 5;
-        if (d < 0)
-          d = 0;
-        if (d > 100)
-          d = 100;
-        temp_density = (uint8_t)d;
-        seq_randomize_gates(temp_density);
-        ui_show_chaos_generator(seq_get_gate_mask(), temp_density);
-      } else if (edit_mode == TOOLS_RANDOM_PITCHES) {
-        temp_scale_idx += encoder_delta;
-        int max_scales = seq_get_num_scales();
-        if (temp_scale_idx < 0)
-          temp_scale_idx = max_scales - 1;
-        if (temp_scale_idx >= max_scales)
-          temp_scale_idx = 0;
-        seq_randomize_pitches(temp_scale_idx);
-        ui_show_random_pitches(temp_scale_idx,
-                               seq_get_scale_name(temp_scale_idx));
+        if (tools_edit_mode) {
+          if (tools_selection == 0) { // Scale
+            int gs = seq_get_global_scale() + encoder_delta;
+            int ns = seq_get_num_scales();
+            if (gs < 0)
+              gs = ns - 1;
+            if (gs >= ns)
+              gs = 0;
+            seq_set_global_scale(gs);
+          } else if (tools_selection == 1) { // Random Gates
+            int d = (int)temp_density + encoder_delta * 5;
+            if (d < 0)
+              d = 0;
+            if (d > 100)
+              d = 100;
+            temp_density = (uint8_t)d;
+            seq_randomize_gates(temp_density);
+          }
+        } else {
+          tools_selection += encoder_delta;
+          if (tools_selection < 0)
+            tools_selection = 2; // 3 options: 0, 1, 2
+          if (tools_selection > 2)
+            tools_selection = 0;
+        }
+        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density);
       } else if (edit_mode == EDIT_NONE) {
         if (io_is_step_button_pressed()) {
           int ns = (int)seq_get_steps() + encoder_delta;

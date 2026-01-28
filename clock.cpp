@@ -52,7 +52,8 @@ void handle_tick() {
       // Update CV on Core 1
       if (seq_get_gate_enabled(step)) {
         uint8_t midi_note = seq_get_note(step);
-        int32_t semitones = (int32_t)midi_note - MIDI_BASE;
+        uint8_t quantized_note = seq_quantize_note(midi_note);
+        int32_t semitones = (int32_t)quantized_note - MIDI_BASE;
         int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
         if (dac_val < 0)
           dac_val = 0;
