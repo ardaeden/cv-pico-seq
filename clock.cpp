@@ -258,6 +258,15 @@ void clock_gate_enable(bool enable) { gate_enabled = enable; }
 
 void clock_out_enable(bool enable) { clock_out_enabled = enable; }
 
+void clock_reset() {
+  uint32_t save = save_and_disable_interrupts();
+  internal_tick_count = 0;
+  tick_flag = false;
+  clock_pin_state = false;
+  us_counter = 0;
+  restore_interrupts(save);
+}
+
 void clock_set_cv(uint16_t dac_val) {
   uint32_t save = save_and_disable_interrupts();
 
@@ -289,5 +298,12 @@ void clock_restart() {
   clock_pin_state = false;
   last_external_tick_us = 0;
 
+  restore_interrupts(save);
+}
+
+void clock_resume() {
+  uint32_t save = save_and_disable_interrupts();
+  us_counter = 0;
+  clock_pin_state = false;
   restore_interrupts(save);
 }

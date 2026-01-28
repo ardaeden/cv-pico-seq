@@ -26,8 +26,14 @@ void clock_gate_enable(bool enable);
 // Enable/disable the 24 PPQN clock output on GPIO22
 void clock_out_enable(bool enable);
 
+// Reset internal tick counter (call when stopping or before playing)
+void clock_reset();
+
 // Set CV/DAC value (updated on next tick by core 1)
 void clock_set_cv(uint16_t dac_value);
 
 // Reset the internal us_counter to align with a start event
 void clock_restart();
+
+// Resume clock without resetting tick counters (for Pause -> Play)
+void clock_resume();

@@ -91,7 +91,10 @@ int main() {
         clock_gate_enable(true);
         clock_out_enable(true);
         seq_set_playing(true);
-        clock_restart();
+        if (current_tstate == TSTATE_STOP)
+          clock_restart();
+        else
+          clock_resume();
 
         if (seq_current_step() % 4 == 0)
           io_blink_led_start();
