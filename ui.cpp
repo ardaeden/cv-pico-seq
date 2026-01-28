@@ -1006,48 +1006,59 @@ void ui_show_settings(int current_option, ClockSource clock_source,
   ssd1306_clear_fb();
   ui_draw_text(36, 0, "SETTINGS");
 
+  const int NUM_ITEMS = 4;
+  const int VISIBLE_ITEMS = 3;
+  static int top_item = 0;
+
+  // Adjust scroll window
+  if (current_option < top_item) {
+    top_item = current_option;
+  } else if (current_option >= top_item + VISIBLE_ITEMS) {
+    top_item = current_option - VISIBLE_ITEMS + 1;
+  }
+
   char buf[32];
+  for (int i = 0; i < VISIBLE_ITEMS; i++) {
+    int item_idx = top_item + i;
+    if (item_idx >= NUM_ITEMS)
+      break;
 
-  // Option 0: Clock
-  const char *source_str =
-      (clock_source == CLOCK_INTERNAL) ? "INTERNAL" : "EXTERNAL";
-  sprintf(buf, "%sCLOCK: ", (current_option == 0) ? ">> " : "   ");
-  ui_draw_text(0, 2, buf);
-  int clock_val_x = strlen(buf) * 6;
-  ui_draw_text(clock_val_x, 2, source_str);
-  if (current_option == 0 && edit_mode) {
-    invert_region(clock_val_x - 1, 2 * 8 - 1, strlen(source_str) * 6, 9);
-  }
+    int y_row = 2 + (i * 2); // Row index (0, 2, 4, 6 etc)
+    int y_px = y_row * 8;
 
-  // Option 1: Gate Length
-  sprintf(buf, "%sGATE LEN: ", (current_option == 1) ? ">> " : "   ");
-  ui_draw_text(0, 4, buf);
-  char val_buf[16];
-  sprintf(val_buf, "%d%%", gate_length);
-  int gate_val_x = strlen(buf) * 6;
-  ui_draw_text(gate_val_x, 4, val_buf);
-  if (current_option == 1 && edit_mode) {
-    invert_region(gate_val_x - 1, 4 * 8 - 1, strlen(val_buf) * 6, 9);
-  }
+    const char *label = "";
+    char val_buf[16] = "";
 
-  // Option 2: PPQN
-  sprintf(buf, "%sPPQN: ", (current_option == 2) ? ">> " : "   ");
-  ui_draw_text(0, 6, buf);
-  char ppqn_buf[16];
-  sprintf(ppqn_buf, "%d", ppqn);
-  int ppqn_val_x = strlen(buf) * 6;
-  ui_draw_text(ppqn_val_x, 6, ppqn_buf);
-  if (current_option == 2 && edit_mode) {
-    invert_region(ppqn_val_x - 1, 6 * 8 - 1, strlen(ppqn_buf) * 6, 9);
-  }
-  // Option 3: Pattern Load Mode
-  const char *load_str = (load_mode == LOAD_INSTANT) ? "INST" : "WAIT";
-  sprintf(buf, "%sLOAD: ", (current_option == 3) ? ">> " : "   ");
-  ui_draw_text(0, 6, buf);
-  int load_val_x = strlen(buf) * 6;
-  ui_draw_text(load_val_x, 6, load_str);
-  if (current_option == 3 && edit_mode) {
-    invert_region(load_val_x - 1, 6 * 8 - 1, strlen(load_str) * 6, 9);
+    switch (item_idx) {
+    case 0:
+      label = "CLOCK:";
+      sprintf(val_buf, "%s",
+              (clock_source == CLOCK_INTERNAL) ? "INTERNAL" : "EXTERNAL");
+      break;
+    case 1:
+      label = "GATE LEN:";
+      sprintf(val_buf, "%d%%", gate_length);
+      break;
+    case 2:
+      label = "PPQN:";
+      sprintf(val_buf, "%d", ppqn);
+      break;
+    case 3:
+      label = "LOAD:";
+      sprintf(val_buf, "%s", (load_mode == LOAD_INSTANT) ? "INST" : "WAIT");
+      break;
+    }
+
+    // Draw row
+    sprintf(buf, "%s%s ", (current_option == item_idx) ? ">> " : "   ", label);
+    ui_draw_text(0, y_row, buf);
+    int val_x = strlen(buf) * 6;
+    ui_draw_text(val_x, y_row, val_buf);
+
+    // Highlight if editing
+    if (current_option == item_idx && edit_mode) {
+      invert_region(val_x - 1, y_px - 1, strlen(val_buf) * 6 + 1, 9);
+    }
   }
 
   // Firmware Version (bottom-right)

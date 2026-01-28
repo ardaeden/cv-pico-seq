@@ -54,7 +54,7 @@ uint8_t seq_get_next_note_in_scale(uint8_t current_note, int delta);
 uint8_t seq_quantize_note(uint8_t note);
 
 void seq_randomize_gates(uint8_t density_percent);
-void seq_clear_gates();
+void seq_reset_pattern();
 int seq_get_num_scales();
 const char *seq_get_scale_name(int scale_idx);
 

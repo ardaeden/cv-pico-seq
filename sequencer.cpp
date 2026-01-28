@@ -398,7 +398,13 @@ void seq_randomize_gates(uint8_t density_percent) {
   }
 }
 
-void seq_clear_gates() { state.gate_mask = 0; }
+void seq_reset_pattern() {
+  state.gate_mask = 0;
+  state.tie_mask = 0;
+  for (int i = 0; i < 32; i++) {
+    state.notes[i] = 60; // C4
+  }
+}
 
 struct Scale {
   const char *name;

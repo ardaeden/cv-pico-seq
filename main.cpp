@@ -86,9 +86,9 @@ int main() {
       bool was_playing = seq_is_playing();
       if (!was_playing) {
         // Start or Resume
-        seq_set_playing(true);
         clock_gate_enable(true);
         clock_out_enable(true);
+        seq_set_playing(true);
         clock_restart();
 
         if (seq_current_step() % 4 == 0)
@@ -268,7 +268,7 @@ int main() {
             tools_edit_mode = true;
             clear_confirmed = false;
           } else {
-            seq_clear_gates();
+            seq_reset_pattern();
             clear_confirmed = true;
             tools_edit_mode = false;
           }
@@ -328,9 +328,9 @@ int main() {
         if (!settings_edit_mode) {
           settings_option += encoder_delta;
           if (settings_option < 0)
-            settings_option = NUM_SETTINGS - 1;
-          if (settings_option >= NUM_SETTINGS)
             settings_option = 0;
+          if (settings_option >= NUM_SETTINGS)
+            settings_option = NUM_SETTINGS - 1;
         } else {
           if (settings_option == 1) {
             int len = (int)clock_get_gate_length() + encoder_delta * 10;
