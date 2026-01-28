@@ -267,22 +267,6 @@ void clock_reset() {
   restore_interrupts(save);
 }
 
-void clock_set_cv(uint16_t dac_val) {
-  uint32_t save = save_and_disable_interrupts();
-
-  if (dac_val > 0x0FFF)
-    dac_val = 0x0FFF;
-
-  uint16_t command = 0x1000 | (dac_val & 0x0FFF);
-  uint8_t buf[2] = {(uint8_t)(command >> 8), (uint8_t)(command & 0xFF)};
-
-  gpio_put(DAC_CS_PIN, false);
-  spi_write_blocking(spi0, buf, 2);
-  gpio_put(DAC_CS_PIN, true);
-
-  restore_interrupts(save);
-}
-
 void clock_restart() {
   uint32_t save = save_and_disable_interrupts();
   us_counter = (clock_interval_us > 0) ? clock_interval_us

@@ -37,7 +37,6 @@ int main() {
     SETTINGS,
     PATTERN_TOOLS,
     TOOLS_RANDOM_GATES,
-    TOOLS_RANDOM_PITCHES,
     TOOLS_CLEAR
   };
   EditMode edit_mode = EDIT_NONE;
@@ -160,10 +159,9 @@ int main() {
       // Button Released
       if (!edit_long_press_triggered) {
         // Short Press: Toggle Edit Modes
-        if (edit_mode == EDIT_NONE || edit_mode == SETTINGS ||
-            edit_mode == PATTERN_SELECT || edit_mode == PATTERN_TOOLS ||
-            edit_mode == TOOLS_RANDOM_GATES ||
-            edit_mode == TOOLS_RANDOM_PITCHES || edit_mode == TOOLS_CLEAR) {
+        if (edit_mode == EDIT_NONE || edit_mode == PATTERN_SELECT ||
+            edit_mode == SETTINGS || edit_mode == PATTERN_TOOLS ||
+            edit_mode == TOOLS_RANDOM_GATES || edit_mode == TOOLS_CLEAR) {
           edit_mode = EDIT_SELECT_STEP;
           edit_step = 0;
           ui_show_edit_step(edit_step, seq_get_note(edit_step));
@@ -171,7 +169,11 @@ int main() {
           edit_mode = EDIT_NONE;
           ui_clear();
           ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                      current_tstate, false, encoder_step == 10);
+                      current_tstate, false, encoder_step == 10,
+                      current_tstate == TSTATE_STOP ? 0 : seq_current_step(),
+                      seq_get_steps(),
+                      current_tstate == TSTATE_PAUSE ? !pause_icon_visible
+                                                     : false);
           ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                       : 0xFFFFFFFF,
                         seq_get_steps());
@@ -240,9 +242,7 @@ int main() {
         ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                     : 0xFFFFFFFF,
                       seq_get_steps());
-      } else if (edit_mode == TOOLS_RANDOM_GATES ||
-                 edit_mode == TOOLS_RANDOM_PITCHES ||
-                 edit_mode == TOOLS_CLEAR) {
+      } else if (edit_mode == TOOLS_RANDOM_GATES || edit_mode == TOOLS_CLEAR) {
         edit_mode = PATTERN_TOOLS;
         ui_show_pattern_tools(tools_selection);
       } else {
@@ -292,8 +292,11 @@ int main() {
           clock_set_source(clock_get_source() == CLOCK_INTERNAL
                                ? CLOCK_EXTERNAL
                                : CLOCK_INTERNAL);
-        } else if (settings_option == 1 || settings_option == 2 ||
-                   settings_option == 3) {
+        } else if (settings_option == 3) {
+          PatternLoadMode mode = seq_get_load_mode();
+          mode = (mode == LOAD_INSTANT) ? LOAD_WAIT_END : LOAD_INSTANT;
+          seq_set_load_mode(mode);
+        } else if (settings_option == 1 || settings_option == 2) {
           settings_edit_mode = !settings_edit_mode;
         }
         ui_show_settings(settings_option, clock_get_source(),
@@ -395,10 +398,6 @@ int main() {
             if (idx > 5)
               idx = 5;
             clock_set_ppqn(ppqns[idx]);
-          } else if (settings_option == 3) {
-            PatternLoadMode mode = seq_get_load_mode();
-            mode = (mode == LOAD_INSTANT) ? LOAD_WAIT_END : LOAD_INSTANT;
-            seq_set_load_mode(mode);
           }
         }
         ui_show_settings(settings_option, clock_get_source(),

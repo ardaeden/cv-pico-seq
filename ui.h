@@ -45,7 +45,5 @@ void ui_show_pattern_tools(int current_option, bool edit_mode = false,
 
 // Low-level drawing functions for custom animations
 void clear_region(int x, int y, int w, int h);
-void draw_scaled_char(int x0, int y0, char c, int scale);
 void draw_scaled_text(int x, int y, const char *text, int scale);
-void draw_centered_text(int y, const char *text, int scale);
 void ssd1306_update();

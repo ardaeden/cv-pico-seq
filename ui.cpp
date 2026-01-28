@@ -218,7 +218,7 @@ static void clear_pixel(int x, int y) {
   fb[page * 128 + x] &= ~(1u << bit);
 }
 
-void draw_scaled_char(int x0, int y0, char c, int scale) {
+static void draw_scaled_char(int x0, int y0, char c, int scale) {
   int idx = char_to_font_index(c);
   const uint8_t *glyph = font5x7[idx];
   // glyph: 5 columns, 7 rows (LSB top)
@@ -492,7 +492,7 @@ void draw_scaled_text(int x, int y, const char *text, int scale) {
   }
 }
 
-void draw_centered_text(int y, const char *text, int scale) {
+static void draw_centered_text(int y, const char *text, int scale) {
   int char_w = (5 * scale) + 2;
   int total_w = strlen(text) * char_w;
   int x = (128 - total_w) / 2;
