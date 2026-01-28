@@ -374,31 +374,33 @@ void ui_clear() {
 
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
                  TransportState tstate, bool blink_slot, bool bpm_inverted,
-                 uint32_t current_step, uint32_t total_steps) {
+                 uint32_t current_step, uint32_t total_steps, bool blink_icon) {
   // Clear only the top page for BPM (1 page height, full width)
   for (int i = 0; i < 128; ++i) {
     fb[0 * 128 + i] = 0x00;
   }
 
-  // Draw Transport Icons (Top-Left)
-  int icon_x = 0;
-  int icon_y = 1; // Slight offset from top
-  switch (tstate) {
-  case TSTATE_STOP:
-    fill_rect(icon_x, icon_y, 6, 6);
-    break;
-  case TSTATE_PLAY:
-    // Right pointing triangle
-    for (int i = 0; i < 4; ++i) {
-      for (int j = i; j < 7 - i; ++j) {
-        set_pixel(icon_x + i, icon_y + j);
+  // Draw Transport Icons (Top-Left) - skip if blinking
+  if (!blink_icon) {
+    int icon_x = 0;
+    int icon_y = 1; // Slight offset from top
+    switch (tstate) {
+    case TSTATE_STOP:
+      fill_rect(icon_x, icon_y, 6, 6);
+      break;
+    case TSTATE_PLAY:
+      // Right pointing triangle
+      for (int i = 0; i < 4; ++i) {
+        for (int j = i; j < 7 - i; ++j) {
+          set_pixel(icon_x + i, icon_y + j);
+        }
       }
+      break;
+    case TSTATE_PAUSE:
+      fill_rect(icon_x, icon_y, 2, 6);
+      fill_rect(icon_x + 4, icon_y, 2, 6);
+      break;
     }
-    break;
-  case TSTATE_PAUSE:
-    fill_rect(icon_x, icon_y, 2, 6);
-    fill_rect(icon_x + 4, icon_y, 2, 6);
-    break;
   }
 
   // Draw Tempo/Source (next to icon)

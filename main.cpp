@@ -58,6 +58,8 @@ int main() {
   uint8_t blink_slot = 0;
 
   bool step_button_down = false;
+  uint32_t pause_blink_timer = 0;
+  bool pause_icon_visible = true;
   uint64_t step_button_press_start_us = 0;
   bool step_button_was_modified = false;
 
@@ -107,6 +109,8 @@ int main() {
         clock_gate_enable(false);
         clock_out_enable(false);
         current_tstate = TSTATE_PAUSE;
+        pause_blink_timer = time_us_64();
+        pause_icon_visible = true;
         if (edit_mode == EDIT_NONE) {
           ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
                       current_tstate, false, encoder_step == 10,
@@ -186,7 +190,11 @@ int main() {
         edit_mode = EDIT_NONE;
         ui_clear();
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, false, encoder_step == 10);
+                    current_tstate, false, encoder_step == 10,
+                    current_tstate == TSTATE_STOP ? 0 : seq_current_step(),
+                    seq_get_steps(),
+                    current_tstate == TSTATE_PAUSE ? !pause_icon_visible
+                                                   : false);
         ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                     : 0xFFFFFFFF,
                       seq_get_steps());
@@ -209,7 +217,11 @@ int main() {
         edit_mode = EDIT_NONE;
         ui_clear();
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, false, encoder_step == 10);
+                    current_tstate, false, encoder_step == 10,
+                    current_tstate == TSTATE_STOP ? 0 : seq_current_step(),
+                    seq_get_steps(),
+                    current_tstate == TSTATE_PAUSE ? !pause_icon_visible
+                                                   : false);
         ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                     : 0xFFFFFFFF,
                       seq_get_steps());
@@ -217,7 +229,11 @@ int main() {
         edit_mode = EDIT_NONE;
         ui_clear();
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, false, encoder_step == 10);
+                    current_tstate, false, encoder_step == 10,
+                    current_tstate == TSTATE_STOP ? 0 : seq_current_step(),
+                    seq_get_steps(),
+                    current_tstate == TSTATE_PAUSE ? !pause_icon_visible
+                                                   : false);
         ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                     : 0xFFFFFFFF,
                       seq_get_steps());
@@ -260,7 +276,11 @@ int main() {
         edit_mode = EDIT_NONE;
         ui_clear();
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, false, encoder_step == 10);
+                    current_tstate, false, encoder_step == 10,
+                    current_tstate == TSTATE_STOP ? 0 : seq_current_step(),
+                    seq_get_steps(),
+                    current_tstate == TSTATE_PAUSE ? !pause_icon_visible
+                                                   : false);
         ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                     : 0xFFFFFFFF,
                       seq_get_steps());
@@ -295,7 +315,11 @@ int main() {
       } else if (edit_mode == EDIT_NONE) {
         encoder_step = (encoder_step == 1) ? 10 : 1;
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
-                    current_tstate, false, encoder_step == 10);
+                    current_tstate, false, encoder_step == 10,
+                    current_tstate == TSTATE_STOP ? 0 : seq_current_step(),
+                    seq_get_steps(),
+                    current_tstate == TSTATE_PAUSE ? !pause_icon_visible
+                                                   : false);
       }
     }
 
@@ -476,6 +500,19 @@ int main() {
       }
       if (cur % 4 == 0)
         io_blink_led_start();
+    }
+
+    // --- UI/BLINKING LOGIC (PAUSE STATE) ---
+    if (current_tstate == TSTATE_PAUSE && edit_mode == EDIT_NONE) {
+      uint64_t now = time_us_64();
+      if (now - pause_blink_timer > 500000) { // 500ms blink
+        pause_blink_timer = now;
+        pause_icon_visible = !pause_icon_visible;
+
+        ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
+                    current_tstate, false, encoder_step == 10,
+                    seq_current_step(), seq_get_steps(), !pause_icon_visible);
+      }
     }
 
     tight_loop_contents();
