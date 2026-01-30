@@ -7,8 +7,8 @@
 
 namespace {
 constexpr uint8_t EEPROM_BASE_ADDR = 0x50;
-constexpr uint SDA_PIN = 26;
-constexpr uint SCL_PIN = 27;
+constexpr unsigned int SDA_PIN = 26;
+constexpr unsigned int SCL_PIN = 27;
 constexpr uint8_t PATTERN_STORAGE_SIZE =
     73; // 32 notes + 32 velo + 4 gate + 4 tie + 1 step
 constexpr uint8_t NUM_PATTERNS = 25; // User requested 25 slots

@@ -6,22 +6,23 @@
 #include <atomic>
 
 namespace {
-constexpr uint BUTTON_PIN = 2;                 // GP2 - Play/Pause button
-constexpr uint STOP_BUTTON_PIN = 7;            // GP7 - Stop button
-constexpr uint STEP_BUTTON_PIN = 8;            // GP8 - Step count button
-constexpr uint EDIT_BUTTON_PIN = 10;           // GP10 - Edit mode button
-constexpr uint PATTERN_SELECT_BUTTON_PIN = 11; // GP11 - Pattern select button
-constexpr uint SAVE_BUTTON_PIN = 12;           // GP12 - Save button
-constexpr uint64_t DEBOUNCE_US = 20'000;       // 20 ms debounce is enough
-constexpr uint LED_PIN = 3;                    // GP3
+constexpr unsigned int BUTTON_PIN = 2;       // GP2 - Play/Pause button
+constexpr unsigned int STOP_BUTTON_PIN = 7;  // GP7 - Stop button
+constexpr unsigned int STEP_BUTTON_PIN = 8;  // GP8 - Step count button
+constexpr unsigned int EDIT_BUTTON_PIN = 10; // GP10 - Edit mode button
+constexpr unsigned int PATTERN_SELECT_BUTTON_PIN =
+    11;                                      // GP11 - Pattern select button
+constexpr unsigned int SAVE_BUTTON_PIN = 12; // GP12 - Save button
+constexpr uint64_t DEBOUNCE_US = 20'000;     // 20 ms debounce is enough
+constexpr unsigned int LED_PIN = 3;          // GP3
 constexpr uint64_t LED_BLINK_DURATION_US = 20'000; // 20 ms LED on time
 
-constexpr uint ENCODER_CLK = 14;
-constexpr uint ENCODER_DATA = 15;
-constexpr uint ENCODER_SW = 13;
+constexpr unsigned int ENCODER_CLK = 14;
+constexpr unsigned int ENCODER_DATA = 15;
+constexpr unsigned int ENCODER_SW = 13;
 
 struct ButtonTracker {
-  uint pin;
+  unsigned int pin;
   bool last_raw = true;
   bool debounced_state = false; // true = pressed
   uint64_t last_change_us = 0;
@@ -68,15 +69,15 @@ int8_t encoder_accum = 0;
 std::atomic<int> encoder_pending{0};
 constexpr int ENCODER_DETENT_STEPS = 4;
 
-void encoder_gpio_irq(uint gpio, uint32_t events);
+void encoder_gpio_irq(unsigned int gpio, uint32_t events);
 
 } // namespace
 
 void io_init() {
-  uint buttons[] = {
+  unsigned int buttons[] = {
       BUTTON_PIN,      STOP_BUTTON_PIN,           STEP_BUTTON_PIN,
       EDIT_BUTTON_PIN, PATTERN_SELECT_BUTTON_PIN, SAVE_BUTTON_PIN};
-  for (uint pin : buttons) {
+  for (unsigned int pin : buttons) {
     gpio_init(pin);
     gpio_set_dir(pin, GPIO_IN);
     gpio_pull_up(pin);
@@ -157,7 +158,7 @@ void io_encoder_init() {
 int io_encoder_poll_delta() { return encoder_pending.exchange(0); }
 
 namespace {
-void encoder_gpio_irq(uint gpio, uint32_t events) {
+void encoder_gpio_irq(unsigned int gpio, uint32_t events) {
   bool clk = gpio_get(ENCODER_CLK);
   bool data = gpio_get(ENCODER_DATA);
   uint8_t cur = (uint8_t)((clk << 1) | data);

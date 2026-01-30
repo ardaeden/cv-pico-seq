@@ -6,6 +6,11 @@
 #include "ui.h"
 #include <cstdio>
 
+constexpr uint64_t BLINK_DURATION_US = 150000;
+constexpr uint64_t LONG_PRESS_THRESHOLD_US = 500000;
+constexpr uint64_t PAUSE_BLINK_INTERVAL_US = 500000;
+constexpr uint32_t NO_POINTER = 0xFFFFFFFF;
+
 int main() {
   stdio_init_all();
   io_init();
@@ -26,7 +31,7 @@ int main() {
   ui_show_bpm(seq_get_bpm(), 0, clock_get_source(), current_tstate, false,
               encoder_step == 10, 0, seq_get_steps());
   // Hide pointer on boot (0xFFFFFFFF = no pointer)
-  ui_show_steps(0xFFFFFFFF, seq_get_steps());
+  ui_show_steps(NO_POINTER, seq_get_steps());
 
   enum EditMode {
     EDIT_NONE,
@@ -72,7 +77,7 @@ int main() {
 
     if (blink_active) {
       uint64_t elapsed = time_us_64() - blink_start_time;
-      if (elapsed >= 150000) {
+      if (elapsed >= BLINK_DURATION_US) {
         clear_region(40, 16, 48, 32);
         char slot_str[4];
         sprintf(slot_str, "%02d", blink_slot);
@@ -137,7 +142,7 @@ int main() {
                     current_tstate, false, encoder_step == 10, 0,
                     seq_get_steps());
         // Hide pointer when stopped (0xFFFFFFFF = no pointer)
-        ui_show_steps(0xFFFFFFFF, seq_get_steps());
+        ui_show_steps(NO_POINTER, seq_get_steps());
       }
     }
 
@@ -148,7 +153,8 @@ int main() {
       edit_press_start_us = time_us_64();
       edit_long_press_triggered = false;
     } else if (edit_now && edit_button_down && !edit_long_press_triggered) {
-      if (time_us_64() - edit_press_start_us > 500000) { // 500ms threshold
+      if (time_us_64() - edit_press_start_us >
+          LONG_PRESS_THRESHOLD_US) { // 500ms threshold
         edit_long_press_triggered = true;
         edit_mode = PATTERN_TOOLS;
         tools_selection = 0;
@@ -175,7 +181,7 @@ int main() {
                       current_tstate == TSTATE_PAUSE ? !pause_icon_visible
                                                      : false);
           ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
-                                                      : 0xFFFFFFFF,
+                                                      : NO_POINTER,
                         seq_get_steps());
         } else {
           edit_mode = EDIT_SELECT_STEP;
@@ -478,7 +484,7 @@ int main() {
     } else if (step_button_down) {
       uint64_t hold = time_us_64() - step_button_press_start_us;
       step_button_down = false;
-      if (!step_button_was_modified && hold < 500000) {
+      if (!step_button_was_modified && hold < LONG_PRESS_THRESHOLD_US) {
         if (edit_mode == EDIT_SELECT_STEP || edit_mode == EDIT_NOTE ||
             edit_mode == EDIT_VELOCITY) {
           seq_toggle_gate(edit_step);
@@ -507,7 +513,7 @@ int main() {
     // --- UI/BLINKING LOGIC (PAUSE STATE) ---
     if (current_tstate == TSTATE_PAUSE && edit_mode == EDIT_NONE) {
       uint64_t now = time_us_64();
-      if (now - pause_blink_timer > 500000) { // 500ms blink
+      if (now - pause_blink_timer > PAUSE_BLINK_INTERVAL_US) { // 500ms blink
         pause_blink_timer = now;
         pause_icon_visible = !pause_icon_visible;
 

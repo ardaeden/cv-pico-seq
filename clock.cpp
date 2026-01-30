@@ -13,9 +13,9 @@ volatile uint32_t us_counter =
 volatile uint32_t clock_interval_us = 5000;
 volatile bool tick_flag = false;
 
-constexpr uint GATE_PIN = 6;
-constexpr uint CLOCK_OUT_PIN = 22;
-constexpr uint DAC_CS_PIN = 17;
+constexpr unsigned int GATE_PIN = 6;
+constexpr unsigned int CLOCK_OUT_PIN = 22;
+constexpr unsigned int DAC_CS_PIN = 17;
 volatile bool gate_active = false;
 volatile uint32_t gate_start_us = 0; // Changed to 32-bit
 volatile bool gate_enabled = false;
@@ -23,7 +23,7 @@ volatile bool clock_out_enabled = false;
 volatile uint32_t gate_duration_us = 2500; // Changed to 32-bit
 volatile bool clock_pin_state = false;
 
-constexpr uint CLOCK_EXT_PIN = 21;
+constexpr unsigned int CLOCK_EXT_PIN = 21;
 volatile uint32_t current_ppqn = 24;
 volatile uint32_t ticks_per_step = 6;
 volatile ClockSource current_source = CLOCK_INTERNAL;
@@ -109,7 +109,7 @@ void handle_tick() {
 
 struct repeating_timer timer_state;
 
-void external_clock_callback(uint gpio, uint32_t events) {
+void external_clock_callback(unsigned int gpio, uint32_t events) {
   if (gpio == CLOCK_EXT_PIN && current_source == CLOCK_EXTERNAL) {
     uint32_t now = (uint32_t)time_us_64();
     // 2ms Blanking period to prevent noise/bouncing triggers

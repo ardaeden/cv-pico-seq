@@ -12,9 +12,12 @@ static const char *velo_names[] = {"pp", "p", "mf", "f", "ff"};
 
 static const int SDA_PIN = 4;
 static const int SCL_PIN = 5;
-static const uint8_t SSD1306_ADDR = 0x3C;
+constexpr int SCREEN_WIDTH = 128;
+constexpr int SCREEN_HEIGHT = 64;
 
-static uint8_t fb[128 * 8];
+static uint8_t SSD1306_ADDR = 0x3C;
+
+static uint8_t fb[SCREEN_WIDTH * (SCREEN_HEIGHT / 8)];
 
 static int32_t ui_edit_step_prev_step = -1;
 static uint32_t ui_edit_step_prev_gate = 0xFFFFFFFF;
@@ -159,19 +162,19 @@ void ssd1306_update() {
     ssd1306_write_command(0x00);
     ssd1306_write_command(0x10);
 
-    uint8_t buf[129];
+    uint8_t buf[SCREEN_WIDTH + 1];
     buf[0] = 0x40;
-    memcpy(&buf[1], &fb[page * 128], 128);
-    i2c_write_blocking(i2c0, SSD1306_ADDR, buf, 129, false);
+    memcpy(&buf[1], &fb[page * SCREEN_WIDTH], SCREEN_WIDTH);
+    i2c_write_blocking(i2c0, SSD1306_ADDR, buf, SCREEN_WIDTH + 1, false);
   }
 }
 
 static void ui_draw_char(int x, int page, char c) {
   int idx = char_to_font_index(c);
   const uint8_t *glyph = font5x7[idx];
-  if (x < 0 || x + 6 > 128)
+  if (x < 0 || x + 6 > SCREEN_WIDTH)
     return;
-  uint8_t *dst = &fb[page * 128 + x];
+  uint8_t *dst = &fb[page * SCREEN_WIDTH + x];
   for (int i = 0; i < 5; ++i)
     dst[i] = glyph[i];
   dst[5] = 0x00;
@@ -191,8 +194,8 @@ static void ui_draw_text_inverted(int x, int page, const char *str) {
   while (*str) {
     int idx = char_to_font_index(*str);
     const uint8_t *glyph = font5x7[idx];
-    if (pos >= 0 && pos + 6 <= 128) {
-      uint8_t *dst = &fb[page * 128 + pos];
+    if (pos >= 0 && pos + 6 <= SCREEN_WIDTH) {
+      uint8_t *dst = &fb[page * SCREEN_WIDTH + pos];
       for (int i = 0; i < 5; ++i)
         dst[i] = ~glyph[i];
       dst[5] = 0xFF;
@@ -203,19 +206,19 @@ static void ui_draw_text_inverted(int x, int page, const char *str) {
 }
 
 static void set_pixel(int x, int y) {
-  if (x < 0 || x >= 128 || y < 0 || y >= 64)
+  if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT)
     return;
   int page = y >> 3;
   int bit = y & 7;
-  fb[page * 128 + x] |= (1u << bit);
+  fb[page * SCREEN_WIDTH + x] |= (1u << bit);
 }
 
 static void clear_pixel(int x, int y) {
-  if (x < 0 || x >= 128 || y < 0 || y >= 64)
+  if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT)
     return;
   int page = y >> 3;
   int bit = y & 7;
-  fb[page * 128 + x] &= ~(1u << bit);
+  fb[page * SCREEN_WIDTH + x] &= ~(1u << bit);
 }
 
 static void draw_scaled_char(int x0, int y0, char c, int scale) {
@@ -267,8 +270,8 @@ void ui_boot_animation() {
   // Phase 1: Noise Sweep (Digital Rain style)
   for (int frame = 0; frame < 20; frame++) {
     for (int i = 0; i < 150; i++) {
-      int x = rand() % 128;
-      int y = rand() % 64;
+      int x = rand() % SCREEN_WIDTH;
+      int y = rand() % SCREEN_HEIGHT;
       set_pixel(x, y);
     }
     ssd1306_update();
@@ -276,7 +279,7 @@ void ui_boot_animation() {
     if (frame % 2 == 0) {
       // Partially clear some bits for "raining" effect
       for (int i = 0; i < 100; i++) {
-        clear_pixel(rand() % 128, rand() % 64);
+        clear_pixel(rand() % SCREEN_WIDTH, rand() % SCREEN_HEIGHT);
       }
     }
   }
@@ -285,7 +288,7 @@ void ui_boot_animation() {
   ssd1306_clear_fb();
   int scale = 3;
   int brand_w = (5 * scale + 2) * 4;
-  int brand_x = (128 - brand_w) / 2;
+  int brand_x = (SCREEN_WIDTH - brand_w) / 2;
   int brand_y = 6;
 
   for (int i = 0; i < 4; i++) {
@@ -295,7 +298,8 @@ void ui_boot_animation() {
       int cur_y = start_y + (brand_y - start_y) * (step + 1) / 5;
 
       // Clear vertical strip for this character
-      clear_region(brand_x + i * (5 * scale + 2), 0, (5 * scale + 2), 64);
+      clear_region(brand_x + i * (5 * scale + 2), 0, (5 * scale + 2),
+                   SCREEN_HEIGHT);
       draw_scaled_char(brand_x + i * (5 * scale + 2), cur_y, brand[i], scale);
       ssd1306_update();
       sleep_ms(10);
@@ -308,12 +312,12 @@ void ui_boot_animation() {
     int shift = (rand() % 16) - 8;
 
     // Copy a page to a temp buffer, shift it, and write back
-    uint8_t temp[128];
-    memcpy(temp, &fb[line * 128], 128);
+    uint8_t temp[SCREEN_WIDTH];
+    memcpy(temp, &fb[line * SCREEN_WIDTH], SCREEN_WIDTH);
 
-    for (int x = 0; x < 128; x++) {
-      int src_x = (x - shift + 128) % 128;
-      fb[line * 128 + x] = temp[src_x];
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
+      int src_x = (x - shift + SCREEN_WIDTH) % SCREEN_WIDTH;
+      fb[line * SCREEN_WIDTH + x] = temp[src_x];
     }
 
     ssd1306_update();
@@ -326,7 +330,7 @@ void ui_boot_animation() {
 
   // Phase 4: Info Reveal (Typewriter style)
   int sub_w = strlen(sub) * 6;
-  int sub_x = (128 - sub_w) / 2;
+  int sub_x = (SCREEN_WIDTH - sub_w) / 2;
   int sub_y_page = 5;
 
   for (size_t i = 1; i <= strlen(sub); i++) {
@@ -340,7 +344,7 @@ void ui_boot_animation() {
 
   // Version Reveal
   int ver_w = strlen(ver_buf) * 6;
-  int ver_x = (128 - ver_w) / 2;
+  int ver_x = (SCREEN_WIDTH - ver_w) / 2;
   ui_draw_text(ver_x, 7, ver_buf);
   ssd1306_update();
 
@@ -348,7 +352,7 @@ void ui_boot_animation() {
 
   // Exit with a vertical split
   for (int h = 0; h < 32; h += 4) {
-    for (int x = 0; x < 128; x++) {
+    for (int x = 0; x < SCREEN_WIDTH; x++) {
       clear_pixel(x, 32 - h);
       clear_pixel(x, 32 + h);
     }
@@ -376,8 +380,8 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
                  TransportState tstate, bool blink_slot, bool bpm_inverted,
                  uint32_t current_step, uint32_t total_steps, bool blink_icon) {
   // Clear only the top page for BPM (1 page height, full width)
-  for (int i = 0; i < 128; ++i) {
-    fb[0 * 128 + i] = 0x00;
+  for (int i = 0; i < SCREEN_WIDTH; ++i) {
+    fb[0 * SCREEN_WIDTH + i] = 0x00;
   }
 
   // Draw Transport Icons (Top-Left) - skip if blinking
@@ -421,7 +425,7 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
   if (!blink_slot) {
     char slot_buf[8];
     snprintf(slot_buf, sizeof(slot_buf), "P:%d", pattern_slot);
-    int slot_x = 128 - (strlen(slot_buf) * 6); // Right align
+    int slot_x = SCREEN_WIDTH - (strlen(slot_buf) * 6); // Right align
     ui_draw_text(slot_x, 0, slot_buf);
   }
 
@@ -432,7 +436,8 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
              (unsigned)(current_step + 1), (unsigned)total_steps);
     int step_width = strlen(step_buf) * 6;
     int slot_width = 4 * 6; // "P:X" width (always reserve space)
-    int step_x = 128 - slot_width - step_width - 6; // 6px gap from slot
+    int step_x =
+        SCREEN_WIDTH - slot_width - step_width - 6; // 6px gap from slot
     ui_draw_text(step_x, 0, step_buf);
   }
 
@@ -449,15 +454,15 @@ void clear_region(int x0, int y0, int w, int h) {
     x0 = 0;
   if (y0 < 0)
     y0 = 0;
-  if (x1 >= 128)
-    x1 = 127;
-  if (y1 >= 64)
-    y1 = 63;
+  if (x1 >= SCREEN_WIDTH)
+    x1 = SCREEN_WIDTH - 1;
+  if (y1 >= SCREEN_HEIGHT)
+    y1 = SCREEN_HEIGHT - 1;
   for (int y = y0; y <= y1; ++y) {
     int page = y >> 3;
     int bit = y & 7;
     for (int x = x0; x <= x1; ++x) {
-      fb[page * 128 + x] &= ~(1u << bit);
+      fb[page * SCREEN_WIDTH + x] &= ~(1u << bit);
     }
   }
 }
@@ -471,15 +476,15 @@ static void invert_region(int x0, int y0, int w, int h) {
     x0 = 0;
   if (y0 < 0)
     y0 = 0;
-  if (x1 >= 128)
-    x1 = 127;
-  if (y1 >= 64)
-    y1 = 63;
+  if (x1 >= SCREEN_WIDTH)
+    x1 = SCREEN_WIDTH - 1;
+  if (y1 >= SCREEN_HEIGHT)
+    y1 = SCREEN_HEIGHT - 1;
   for (int y = y0; y <= y1; ++y) {
     int page = y >> 3;
     int bit = y & 7;
     for (int x = x0; x <= x1; ++x) {
-      fb[page * 128 + x] ^= (1u << bit);
+      fb[page * SCREEN_WIDTH + x] ^= (1u << bit);
     }
   }
 }
@@ -495,7 +500,7 @@ void draw_scaled_text(int x, int y, const char *text, int scale) {
 static void draw_centered_text(int y, const char *text, int scale) {
   int char_w = (5 * scale) + 2;
   int total_w = strlen(text) * char_w;
-  int x = (128 - total_w) / 2;
+  int x = (SCREEN_WIDTH - total_w) / 2;
   draw_scaled_text(x, y, text, scale);
 }
 
@@ -581,13 +586,13 @@ void ui_show_steps(uint32_t current_step, uint32_t steps) {
   // Total width: 8 boxes + 6 small gaps + 1 large gap
   const int total_w =
       (8 * sq_w) + (6 * spacing_x) + group_gap; // 104 + 12 + 8 = 124
-  const int left = (128 - total_w) / 2;
+  const int left = (SCREEN_WIDTH - total_w) / 2;
 
   // Move grid 2px further down for balance
   const int start_y = 15;
 
   // Clear grid area
-  clear_region(0, start_y - 2, 128, 51);
+  clear_region(0, start_y - 2, SCREEN_WIDTH, 51);
 
   for (int i = 0; i < 32; ++i) {
     int col = i % cols;
@@ -776,8 +781,8 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   const int spacing = 2;
   const int group_gap = 6;
   const int total_w = (8 * sq) + (6 * spacing) + group_gap;
-  const int left = (128 - total_w) / 2;
-  const int bottom_y = 64 - sq;
+  const int left = (SCREEN_WIDTH - total_w) / 2;
+  const int bottom_y = SCREEN_HEIGHT - sq;
   const int top_y = bottom_y - sq - 8;
 
   auto get_step_x = [&](int col) {
