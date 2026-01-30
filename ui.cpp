@@ -795,7 +795,7 @@ void ui_show_edit_step(uint32_t selected_step, uint8_t note) {
   if (first_draw || page_changed) {
     ssd1306_clear_fb();
     char header[32];
-    sprintf(header, "STEP EDIT  PAGE:%d", page + 1);
+    sprintf(header, "PATTERN EDIT PAGE:%d", page + 1);
     ui_draw_text(0, 0, header);
 
     uint32_t total_steps = seq_get_steps();

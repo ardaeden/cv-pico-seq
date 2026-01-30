@@ -166,7 +166,9 @@ void encoder_gpio_irq(uint gpio, uint32_t events) {
   uint8_t idx = (uint8_t)((encoder_prev_state << 2) | cur);
   int8_t delta = trans_table[idx & 0x0F];
   encoder_prev_state = cur;
+
   if (delta != 0) {
+
     encoder_accum += delta;
     if (encoder_accum >= ENCODER_DETENT_STEPS) {
       encoder_accum = 0;

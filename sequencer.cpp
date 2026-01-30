@@ -402,7 +402,8 @@ void seq_reset_pattern() {
   state.gate_mask = 0;
   state.tie_mask = 0;
   for (int i = 0; i < 32; i++) {
-    state.notes[i] = 60; // C4
+    state.notes[i] = 60;     // C4
+    state.velocities[i] = 2; // mf
   }
 }
 
