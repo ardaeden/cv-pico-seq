@@ -1156,3 +1156,17 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
 
   ssd1306_update();
 }
+
+void ui_show_message(const char *msg) {
+  ssd1306_clear_fb();
+  // Draw message somewhat centered vertically
+  // Using scale 2 for visibility
+  int scale = 2;
+  int char_w = (5 * scale) + 2;
+  int total_w = strlen(msg) * char_w;
+  int x = (SCREEN_WIDTH - total_w) / 2;
+  int y = (SCREEN_HEIGHT - (7 * scale)) / 2;
+
+  draw_scaled_text(x, y, msg, scale);
+  ssd1306_update();
+}

@@ -43,6 +43,9 @@ void ui_show_settings(int current_option, ClockSource clock_source,
 void ui_show_pattern_tools(int current_option, bool edit_mode = false,
                            uint8_t density = 50);
 
+// Show a transient message full screen
+void ui_show_message(const char *msg);
+
 // Low-level drawing functions for custom animations
 void clear_region(int x, int y, int w, int h);
 void draw_scaled_text(int x, int y, const char *text, int scale);

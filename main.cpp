@@ -317,13 +317,24 @@ int main() {
             clear_confirmed = false;
           } else {
             seq_reset_pattern();
+            // Visual Confirmation
+            ui_show_message("CLEARED!");
+            sleep_ms(600);
+
+            // Reset and go to Step Edit
             clear_confirmed = true;
             tools_edit_mode = false;
+            edit_mode = EDIT_SELECT_STEP;
+            edit_step = 0;
+            ui_clear();
+            ui_show_edit_step(edit_step, seq_get_note(edit_step));
           }
         } else {
           tools_edit_mode = !tools_edit_mode;
         }
-        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density);
+        if (edit_mode == PATTERN_TOOLS) {
+          ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density);
+        }
       } else if (edit_mode == EDIT_NONE) {
         encoder_step = (encoder_step == 1) ? 10 : 1;
         ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
