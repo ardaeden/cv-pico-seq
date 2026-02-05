@@ -78,7 +78,11 @@ static const uint8_t font5x7[][5] = {
     {0x7C, 0x14, 0x14, 0x14, 0x08},                                 // 45: p
     {0x7C, 0x04, 0x18, 0x04, 0x78},                                 // 46: m
     {0x08, 0x7E, 0x09, 0x01, 0x02},                                 // 47: f
-    {0x23, 0x13, 0x08, 0x64, 0x62}                                  // 48: %
+    {0x23, 0x13, 0x08, 0x64, 0x62},                                 // 48: %
+    {0x08, 0x08, 0x3E, 0x08, 0x08},                                 // 49: +
+    {0x08, 0x08, 0x08, 0x08, 0x08},                                 // 50: -
+    {0x38, 0x44, 0x44, 0x44, 0x20},                                 // 51: c
+    {0x04, 0x3F, 0x44, 0x40, 0x00}                                  // 52: t
 };
 
 static int char_to_font_index(char c) {
@@ -114,6 +118,14 @@ static int char_to_font_index(char c) {
     return 41;
   if (c == '%')
     return 48;
+  if (c == '+')
+    return 49;
+  if (c == '-')
+    return 50;
+  if (c == 'c')
+    return 51;
+  if (c == 't')
+    return 52;
   return 0;
 }
 
@@ -378,7 +390,9 @@ void ui_clear() {
 
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
                  TransportState tstate, bool blink_slot, bool bpm_inverted,
-                 uint32_t current_step, uint32_t total_steps, bool blink_icon) {
+                 uint32_t current_step, uint32_t total_steps, bool blink_icon,
+                 int8_t global_octave, bool octave_inverted,
+                 int8_t global_transpose, bool transpose_inverted) {
   // Clear only the top page for BPM (1 page height, full width)
   for (int i = 0; i < SCREEN_WIDTH; ++i) {
     fb[0 * SCREEN_WIDTH + i] = 0x00;
@@ -409,9 +423,11 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
 
   // Draw Tempo/Source (next to icon)
   int text_padding = 10;
+  int bpm_width = 0;
   if (clock_source == CLOCK_INTERNAL) {
     char numbuf[16];
     snprintf(numbuf, sizeof(numbuf), "%u", (unsigned)bpm);
+    bpm_width = strlen(numbuf) * 6;
     if (bpm_inverted) {
       ui_draw_text_inverted(text_padding, 0, numbuf);
     } else {
@@ -419,26 +435,34 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
     }
   } else {
     ui_draw_text_inverted(text_padding, 0, "SLAVE");
+    bpm_width = 5 * 6;
   }
 
-  // Draw pattern slot on right side (P:0-9) - skip if blinking
+  // Draw Octave (Fixed Position)
+  ui_draw_text(40, 0, "O:");
+  char oct_buf[8];
+  snprintf(oct_buf, sizeof(oct_buf), "%+d", global_octave);
+  if (octave_inverted) {
+    ui_draw_text_inverted(52, 0, oct_buf);
+  } else {
+    ui_draw_text(52, 0, oct_buf);
+  }
+
+  // Draw Transpose (Fixed Position)
+  ui_draw_text(72, 0, "T:");
+  char tr_buf[8];
+  snprintf(tr_buf, sizeof(tr_buf), "%+02d", global_transpose);
+  if (transpose_inverted) {
+    ui_draw_text_inverted(84, 0, tr_buf);
+  } else {
+    ui_draw_text(84, 0, tr_buf);
+  }
+
+  // Draw pattern slot (right aligned)
   if (!blink_slot) {
     char slot_buf[8];
     snprintf(slot_buf, sizeof(slot_buf), "P:%d", pattern_slot);
-    int slot_x = SCREEN_WIDTH - (strlen(slot_buf) * 6); // Right align
-    ui_draw_text(slot_x, 0, slot_buf);
-  }
-
-  // Draw step counter (e.g., "01/16") to the left of pattern slot
-  if (current_step != 0xFFFFFFFF) {
-    char step_buf[8];
-    snprintf(step_buf, sizeof(step_buf), "%02u/%02u",
-             (unsigned)(current_step + 1), (unsigned)total_steps);
-    int step_width = strlen(step_buf) * 6;
-    int slot_width = 4 * 6; // "P:X" width (always reserve space)
-    int step_x =
-        SCREEN_WIDTH - slot_width - step_width - 6; // 6px gap from slot
-    ui_draw_text(step_x, 0, step_buf);
+    ui_draw_text(110, 0, slot_buf);
   }
 
   ssd1306_update();

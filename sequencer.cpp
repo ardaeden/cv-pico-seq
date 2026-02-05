@@ -28,20 +28,25 @@ struct SequencerState {
   uint32_t gate_mask;
   uint32_t tie_mask;
   std::atomic<int> global_scale_idx;
+  int8_t global_octave;
+  int8_t global_transpose;
   PatternLoadMode load_mode;
 };
 
-static SequencerState state = {120,
-                               32,
-                               31,
-                               false,
-                               {48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66,
-                                67, 69, 71, 72, 74, 48, 50, 52, 54, 55, 57,
-                                59, 60, 62, 64, 66, 67, 69, 71, 72, 74},
-                               {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-                                2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-                               0xFFFFFFFF,
-                               0x00000000};
+static SequencerState state = {
+    120,
+    32,
+    31,
+    false,
+    {48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74,
+     48, 50, 52, 54, 55, 57, 59, 60, 62, 64, 66, 67, 69, 71, 72, 74},
+    {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+     2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+    0xFFFFFFFF,
+    0x00000000,
+    8, // CHROMATIC
+    0  // Default octave 0
+};
 } // namespace
 
 void seq_init() {
@@ -54,6 +59,8 @@ void seq_init() {
   }
   state.tie_mask = 0;
   state.global_scale_idx.store(8); // CHROMATIC
+  state.global_octave = 0;
+  state.global_transpose = 0;
   state.load_mode = LOAD_WAIT_END;
 }
 
@@ -385,6 +392,20 @@ void seq_load_pattern(uint8_t slot) {
     state.steps = 32;
   }
   state.current_step = (state.steps > 0) ? (state.steps - 1) : 31;
+
+  // Ensure global_octave/transpose is safe for the new pattern (DAC Range:
+  // 36-84)
+  uint8_t min_n, max_n;
+  seq_get_note_range(min_n, max_n);
+  int8_t current_oct = state.global_octave;
+  int8_t current_tr = state.global_transpose;
+
+  while (min_n + (current_oct * 12) + current_tr < 36 && current_oct < 10)
+    current_oct++;
+  while (max_n + (current_oct * 12) + current_tr > 84 && current_oct > -10)
+    current_oct--;
+
+  state.global_octave = current_oct;
 }
 
 void seq_randomize_gates(uint8_t density_percent) {
@@ -532,3 +553,43 @@ int8_t seq_get_pending_pattern() { return pending_pattern_slot; }
 PatternLoadMode seq_get_load_mode() { return state.load_mode; }
 
 void seq_set_load_mode(PatternLoadMode mode) { state.load_mode = mode; }
+
+void seq_set_global_octave(int8_t octave) {
+  if (octave < -10)
+    octave = -10;
+  if (octave > 10)
+    octave = 10;
+  state.global_octave = octave;
+}
+
+int8_t seq_get_global_octave() { return state.global_octave; }
+
+void seq_set_global_transpose(int8_t semitones) {
+  if (semitones < -11)
+    semitones = -11;
+  if (semitones > 11)
+    semitones = 11;
+  state.global_transpose = semitones;
+}
+
+int8_t seq_get_global_transpose() { return state.global_transpose; }
+
+void seq_get_note_range(uint8_t &min_note, uint8_t &max_note) {
+  min_note = 255;
+  max_note = 0;
+  bool active = false;
+  for (int i = 0; i < state.steps; ++i) {
+    if (state.gate_mask & (1ULL << i)) {
+      uint8_t n = state.notes[i];
+      if (n < min_note)
+        min_note = n;
+      if (n > max_note)
+        max_note = n;
+      active = true;
+    }
+  }
+  if (!active) {
+    min_note = 60; // Default C4 if no notes
+    max_note = 60;
+  }
+}

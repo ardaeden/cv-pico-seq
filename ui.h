@@ -19,7 +19,9 @@ void ui_clear();
 void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
                  TransportState tstate = TSTATE_STOP, bool blink_slot = false,
                  bool bpm_inverted = false, uint32_t current_step = 0xFFFFFFFF,
-                 uint32_t total_steps = 32, bool blink_icon = false);
+                 uint32_t total_steps = 32, bool blink_icon = false,
+                 int8_t global_octave = 0, bool octave_inverted = false,
+                 int8_t global_transpose = 0, bool transpose_inverted = false);
 
 // Display 32-step grid (current_step in [0..steps-1]).
 // Shows 8 squares on top row and 8 on bottom; fills the current step square.

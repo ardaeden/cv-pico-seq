@@ -52,6 +52,11 @@ int seq_get_global_scale();
 void seq_set_global_scale(int scale_idx);
 uint8_t seq_get_next_note_in_scale(uint8_t current_note, int delta);
 uint8_t seq_quantize_note(uint8_t note);
+int8_t seq_get_global_octave();
+void seq_set_global_octave(int8_t octave);
+int8_t seq_get_global_transpose();
+void seq_set_global_transpose(int8_t semitones);
+void seq_get_note_range(uint8_t &min_note, uint8_t &max_note);
 
 void seq_randomize_gates(uint8_t density_percent);
 void seq_reset_pattern();

@@ -53,7 +53,20 @@ void handle_tick() {
       if (seq_get_gate_enabled(step)) {
         uint8_t midi_note = seq_get_note(step);
         uint8_t quantized_note = seq_quantize_note(midi_note);
-        int32_t semitones = (int32_t)quantized_note - MIDI_BASE;
+
+        // Apply Global Octave and Semitone Transposition
+        int32_t octave_offset = seq_get_global_octave();
+        int32_t transpose_offset = seq_get_global_transpose();
+        int32_t transposed_note =
+            (int32_t)quantized_note + (octave_offset * 12) + transpose_offset;
+
+        // Clamp to MIDI range (and DAC range safety)
+        if (transposed_note < 0)
+          transposed_note = 0;
+        if (transposed_note > 127)
+          transposed_note = 127;
+
+        int32_t semitones = transposed_note - MIDI_BASE;
         int32_t dac_val = (int32_t)(semitones * DAC_PER_SEMITONE + 0.5f);
         if (dac_val < 0)
           dac_val = 0;
