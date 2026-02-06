@@ -1250,7 +1250,7 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
       invert_region(46, 38, 4 * 7, 10);
 
     // Star Map Visualization
-    draw_star_map(100, 32, 20);
+    draw_star_map(105, 35, 20);
 
   } else if (current_option == 3) { // CLEAR CARD
     draw_centered_text(2, "RESET PATTERN", 1);
