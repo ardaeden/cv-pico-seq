@@ -1187,28 +1187,30 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
     draw_centered_text(2, "EUCLIDEAN RHYTHM", 1);
 
     char buf[32];
-    sprintf(buf, "STEPS :%lu", (unsigned long)euc_steps);
+    sprintf(buf, "STEPS:%lu", (unsigned long)euc_steps);
     draw_scaled_text(4, 15, buf, 1);
     if (edit_mode && euc_param_idx == 0)
-      invert_region(53, 14, 3 * 7, 10);
+      invert_region(46, 14, 4 * 7, 10);
 
-    sprintf(buf, "FILLS :%lu", (unsigned long)euc_fills);
+    sprintf(buf, "FILLS:%lu", (unsigned long)euc_fills);
     draw_scaled_text(4, 27, buf, 1);
     if (edit_mode && euc_param_idx == 1)
-      invert_region(53, 26, 4 * 7, 10);
+      invert_region(46, 26, 4 * 7, 10);
 
-    sprintf(buf, "ROT   :%d", euc_rot);
+    sprintf(buf, "ROT  :%d", euc_rot);
     draw_scaled_text(4, 39, buf, 1);
     if (edit_mode && euc_param_idx == 2)
-      invert_region(53, 38, 4 * 7, 10);
+      invert_region(46, 38, 4 * 7, 10);
 
-    sprintf(buf, "PROB  :%d%%", euc_probability);
+    sprintf(buf, "PROB :%d%%", euc_probability);
     draw_scaled_text(4, 51, buf, 1);
     if (edit_mode && euc_param_idx == 3)
-      invert_region(53, 50, 4 * 7, 10);
+      invert_region(46, 50, 4 * 7, 10);
 
-    // Visual preview of Euclidean pattern (Smaller to fit PROB)
-    int gx = 94, gy = 24;
+    // Visual preview of Euclidean pattern (Larger size)
+    int gx = 86, gy = 16;
+    int sq_size = 8;
+    int gap = 2;
     for (int i = 0; i < 16; i++) {
       int row = i / 4;
       int col = i % 4;
@@ -1221,29 +1223,31 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
           bit = true;
       }
       if (bit)
-        fill_rect(gx + col * 7, gy + row * 7, 5, 5);
+        fill_rect(gx + col * (sq_size + gap), gy + row * (sq_size + gap),
+                  sq_size, sq_size);
       else
-        draw_rect_outline(gx + col * 7, gy + row * 7, 5, 5);
+        draw_rect_outline(gx + col * (sq_size + gap),
+                          gy + row * (sq_size + gap), sq_size, sq_size);
     }
 
   } else if (current_option == 2) { // MELODY EVOLVE CARD
     draw_centered_text(2, "MELODY EVOLVE", 1);
 
     char buf[32];
-    sprintf(buf, "CHAOS :%u%%", ev_chaos);
+    sprintf(buf, "CHAOS:%u%%", ev_chaos);
     draw_scaled_text(4, 15, buf, 1);
     if (edit_mode && ev_param_idx == 0)
-      invert_region(53, 14, 4 * 7, 10);
+      invert_region(46, 14, 4 * 7, 10);
 
-    sprintf(buf, "WALK  :%u%%", ev_walk);
+    sprintf(buf, "WALK :%u%%", ev_walk);
     draw_scaled_text(4, 27, buf, 1);
     if (edit_mode && ev_param_idx == 1)
-      invert_region(53, 26, 4 * 7, 10);
+      invert_region(46, 26, 4 * 7, 10);
 
-    sprintf(buf, "OCT   :%u", ev_octave);
+    sprintf(buf, "OCT  :%u", ev_octave);
     draw_scaled_text(4, 39, buf, 1);
     if (edit_mode && ev_param_idx == 2)
-      invert_region(53, 38, 4 * 7, 10);
+      invert_region(46, 38, 4 * 7, 10);
 
     // Star Map Visualization
     draw_star_map(100, 32, 20);
