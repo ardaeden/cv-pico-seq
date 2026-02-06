@@ -728,7 +728,8 @@ int main() {
       }
       if (cur == 0 && ev_chaos > 0) {
         seq_evolve_pattern(ev_chaos, ev_walk, ev_octave);
-        if (edit_mode == TOOLS_EVOLVE) {
+        if (edit_mode == TOOLS_EVOLVE ||
+            (edit_mode == PATTERN_TOOLS && tools_selection == 2)) {
           ui_show_pattern_tools(tools_selection, tools_edit_mode, euc_steps,
                                 euc_fills, euc_rot, euc_probability,
                                 euc_param_idx, ev_chaos, ev_walk, ev_octave,
