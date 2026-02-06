@@ -60,7 +60,6 @@ int main() {
   int tools_selection = 0;
   bool tools_edit_mode = false;
 
-  bool clear_confirmed = false;
   uint8_t euc_probability = 100;
 
   uint32_t euc_steps = 16;
@@ -385,7 +384,6 @@ int main() {
           if (!tools_edit_mode) {
             edit_mode = TOOLS_CLEAR;
             tools_edit_mode = true;
-            clear_confirmed = false;
           } else {
             seq_reset_pattern();
             // Visual Confirmation
@@ -393,7 +391,6 @@ int main() {
             sleep_ms(600);
 
             // Reset and go to Step Edit
-            clear_confirmed = true;
             tools_edit_mode = false;
             edit_mode = EDIT_SELECT_STEP;
             edit_step = 0;
@@ -439,7 +436,6 @@ int main() {
           seq_reset_pattern();
           ui_show_message("CLEARED!");
           sleep_ms(600);
-          clear_confirmed = true;
           tools_edit_mode = false;
           edit_mode = EDIT_SELECT_STEP;
           edit_step = 0;
