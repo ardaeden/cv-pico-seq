@@ -46,7 +46,8 @@ int main() {
     SETTINGS,
     PATTERN_TOOLS,
     TOOLS_CLEAR,
-    TOOLS_EUCLIDEAN
+    TOOLS_EUCLIDEAN,
+    TOOLS_EVOLVE
   };
   EditMode edit_mode = EDIT_NONE;
   uint32_t edit_step = 0;
@@ -66,6 +67,11 @@ int main() {
   uint32_t euc_fills = 4;
   int euc_rot = 0;
   int euc_param_idx = 0;
+
+  uint8_t ev_chaos = 0;
+  uint8_t ev_walk = 20;
+  uint8_t ev_octave = 2;
+  int ev_param_idx = 0;
 
   bool blink_active = false;
   uint64_t blink_start_time = 0;
@@ -177,18 +183,21 @@ int main() {
         tools_edit_mode = false;
         ui_show_pattern_tools(tools_selection, tools_edit_mode, euc_steps,
                               euc_fills, euc_rot, euc_probability,
-                              euc_param_idx);
+                              euc_param_idx, ev_chaos, ev_walk, ev_octave,
+                              ev_param_idx);
       }
     } else if (!edit_now && edit_button_down) {
       // Button Released
       if (!edit_long_press_triggered) {
-        // Short Press: Toggle Edit Modes or BACK navigation
-        if (edit_mode == TOOLS_CLEAR || edit_mode == TOOLS_EUCLIDEAN) {
+        // Short Press logic
+        if (edit_mode == TOOLS_CLEAR || edit_mode == TOOLS_EUCLIDEAN ||
+            edit_mode == TOOLS_EVOLVE) {
           // BACK from sub-menu to card selection
           edit_mode = PATTERN_TOOLS;
           tools_edit_mode = false;
           ui_show_pattern_tools(tools_selection, false, euc_steps, euc_fills,
-                                euc_rot, euc_probability, euc_param_idx);
+                                euc_rot, euc_probability, euc_param_idx,
+                                ev_chaos, ev_walk, ev_octave, ev_param_idx);
         } else if (edit_mode == PATTERN_TOOLS) {
           // BACK from card selection to main screen
           edit_mode = EDIT_NONE;
@@ -294,10 +303,10 @@ int main() {
         ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                     : 0xFFFFFFFF,
                       seq_get_steps());
-      } else if (edit_mode == TOOLS_CLEAR || edit_mode == TOOLS_EUCLIDEAN) {
         edit_mode = PATTERN_TOOLS;
         ui_show_pattern_tools(tools_selection, false, euc_steps, euc_fills,
-                              euc_rot, euc_probability, euc_param_idx);
+                              euc_rot, euc_probability, euc_param_idx, ev_chaos,
+                              ev_walk, ev_octave, ev_param_idx);
       } else {
         edit_mode = SETTINGS;
         settings_option = 0;
@@ -366,7 +375,13 @@ int main() {
             tools_edit_mode = true;
             euc_param_idx = 0;
           }
-        } else if (tools_selection == 2) { // CLEAR Card
+        } else if (tools_selection == 2) { // EVOLVE Card
+          if (!tools_edit_mode) {
+            edit_mode = TOOLS_EVOLVE;
+            tools_edit_mode = true;
+            ev_param_idx = 0;
+          }
+        } else if (tools_selection == 3) { // CLEAR Card
           if (!tools_edit_mode) {
             edit_mode = TOOLS_CLEAR;
             tools_edit_mode = true;
@@ -388,13 +403,22 @@ int main() {
         }
         ui_show_pattern_tools(tools_selection, tools_edit_mode, euc_steps,
                               euc_fills, euc_rot, euc_probability,
-                              euc_param_idx);
+                              euc_param_idx, ev_chaos, ev_walk, ev_octave,
+                              ev_param_idx);
       } else if (edit_mode == TOOLS_EUCLIDEAN) {
         // Cycle parameters in Euclidean mode
         euc_param_idx = (euc_param_idx + 1) % 4;
         ui_show_pattern_tools(tools_selection, tools_edit_mode, euc_steps,
                               euc_fills, euc_rot, euc_probability,
-                              euc_param_idx);
+                              euc_param_idx, ev_chaos, ev_walk, ev_octave,
+                              ev_param_idx);
+      } else if (edit_mode == TOOLS_EVOLVE) {
+        // Cycle parameters in Evolve mode
+        ev_param_idx = (ev_param_idx + 1) % 3;
+        ui_show_pattern_tools(tools_selection, tools_edit_mode, euc_steps,
+                              euc_fills, euc_rot, euc_probability,
+                              euc_param_idx, ev_chaos, ev_walk, ev_octave,
+                              ev_param_idx);
       } else if (edit_mode == TOOLS_CLEAR) {
         // Encoder button acts as toggle/exit for other tools?
         // For now, let's keep random gates toggle logic if needed,
@@ -518,7 +542,7 @@ int main() {
                          clock_get_gate_length(), clock_get_ppqn(),
                          seq_get_load_mode(), settings_edit_mode);
       } else if (edit_mode == PATTERN_TOOLS || edit_mode == TOOLS_CLEAR ||
-                 edit_mode == TOOLS_EUCLIDEAN) {
+                 edit_mode == TOOLS_EUCLIDEAN || edit_mode == TOOLS_EVOLVE) {
         if (tools_edit_mode) {
           if (tools_selection == 0) { // Scale
             int gs = seq_get_global_scale() + encoder_delta;
@@ -559,19 +583,43 @@ int main() {
             }
             seq_generate_euclidean(euc_steps, euc_fills, euc_rot,
                                    euc_probability);
-          } else if (tools_selection == 2) { // CLEAR (no encoder action)
+          } else if (tools_selection == 2) { // EVOLVE
+            if (ev_param_idx == 0) {
+              int nc = (int)ev_chaos + encoder_delta * 5;
+              if (nc < 0)
+                nc = 0;
+              if (nc > 100)
+                nc = 100;
+              ev_chaos = (uint8_t)nc;
+            } else if (ev_param_idx == 1) {
+              int nw = (int)ev_walk + encoder_delta * 5;
+              if (nw < 0)
+                nw = 0;
+              if (nw > 100)
+                nw = 100;
+              ev_walk = (uint8_t)nw;
+            } else if (ev_param_idx == 2) {
+              int no = (int)ev_octave + encoder_delta;
+              if (no < 1)
+                no = 1;
+              if (no > 4)
+                no = 4;
+              ev_octave = (uint8_t)no;
+            }
+          } else if (tools_selection == 3) { // CLEAR (no encoder action)
             // No encoder action for CLEAR in edit mode
           }
         } else {
           tools_selection += encoder_delta;
           if (tools_selection < 0)
-            tools_selection = 2; // 3 options: 0, 1, 2
-          if (tools_selection > 2)
+            tools_selection = 3; // 4 options: 0, 1, 2, 3
+          if (tools_selection > 3)
             tools_selection = 0;
         }
         ui_show_pattern_tools(tools_selection, tools_edit_mode, euc_steps,
                               euc_fills, euc_rot, euc_probability,
-                              euc_param_idx);
+                              euc_param_idx, ev_chaos, ev_walk, ev_octave,
+                              ev_param_idx);
       } else if (edit_mode == EDIT_NONE) {
         if (io_is_step_button_pressed()) {
           int ns = (int)seq_get_steps() + encoder_delta;
@@ -678,6 +726,16 @@ int main() {
                     seq_get_global_octave(), enc_mode == ENC_OCTAVE,
                     seq_get_global_transpose(), enc_mode == ENC_TRANSPOSE);
       }
+      if (cur == 0 && ev_chaos > 0) {
+        seq_evolve_pattern(ev_chaos, ev_walk, ev_octave);
+        if (edit_mode == TOOLS_EVOLVE) {
+          ui_show_pattern_tools(tools_selection, tools_edit_mode, euc_steps,
+                                euc_fills, euc_rot, euc_probability,
+                                euc_param_idx, ev_chaos, ev_walk, ev_octave,
+                                ev_param_idx);
+        }
+      }
+
       if (cur % 4 == 0)
         io_blink_led_start();
     }

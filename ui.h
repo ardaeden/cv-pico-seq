@@ -45,7 +45,9 @@ void ui_show_settings(int current_option, ClockSource clock_source,
 void ui_show_pattern_tools(int current_option, bool edit_mode = false,
                            uint32_t euc_steps = 16, uint32_t euc_fills = 4,
                            int euc_rot = 0, uint8_t euc_probability = 100,
-                           int euc_param_idx = 0);
+                           int euc_param_idx = 0, uint8_t ev_chaos = 0,
+                           uint8_t ev_walk = 20, uint8_t ev_octave = 2,
+                           int ev_param_idx = 0);
 
 // Show a transient message full screen
 void ui_show_message(const char *msg);

@@ -618,3 +618,49 @@ void seq_generate_euclidean(uint32_t steps, uint32_t fills, int rotation,
     }
   }
 }
+
+void seq_evolve_pattern(uint8_t chaos, uint8_t walk_pct, uint8_t octave_limit) {
+  if (chaos == 0)
+    return;
+
+  // Map 0-100% walk to 1-12 scale degrees
+  int max_walk = 1 + (walk_pct * 11) / 100;
+
+  // Get current scale info
+  int scale_idx = seq_get_global_scale();
+
+  for (uint32_t i = 0; i < state.steps; i++) {
+    // Only evolve active gates
+    if (!(state.gate_mask & (1UL << i)))
+      continue;
+
+    // Probability check
+    if ((uint8_t)(rand() % 100) >= chaos)
+      continue;
+
+    // Mutate note by random walk in scale
+    int delta = (rand() % (max_walk * 2 + 1)) - max_walk;
+    if (delta == 0)
+      delta = (rand() % 2) ? 1 : -1;
+
+    uint8_t old_note = state.notes[i];
+    uint8_t new_note = seq_get_next_note_in_scale(old_note, delta);
+
+    // Apply octave limit relative to middle C (60)
+    int min_allowed = 60 - (octave_limit * 12);
+    int max_allowed = 60 + (octave_limit * 12);
+
+    // Hard DAC boundaries
+    if (min_allowed < 36)
+      min_allowed = 36;
+    if (max_allowed > 84)
+      max_allowed = 84;
+
+    if (new_note < min_allowed)
+      new_note = seq_quantize_note(min_allowed);
+    if (new_note > max_allowed)
+      new_note = seq_quantize_note(max_allowed);
+
+    state.notes[i] = new_note;
+  }
+}

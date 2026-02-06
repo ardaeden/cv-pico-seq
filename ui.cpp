@@ -5,6 +5,7 @@
 #include "sequencer.h"
 #include <cstdlib>
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -1117,13 +1118,52 @@ static void draw_page_indicator(int count, int selected) {
   }
 }
 
+static void draw_star_map(int cx, int cy, int r) {
+  // Draw 12 points for chromatic scale
+  const float PI = 3.14159f;
+  for (int i = 0; i < 12; i++) {
+    float angle = (i * 30 - 90) * PI / 180.0f;
+    int px = cx + (int)(r * cosf(angle));
+    int py = cy + (int)(r * sinf(angle));
+    set_pixel(px, py);
+  }
+
+  // Connect active notes in pattern order
+  int last_x = -1, last_y = -1;
+  uint32_t steps = seq_get_steps();
+  for (uint32_t i = 0; i < steps; i++) {
+    if (seq_get_gate_enabled(i)) {
+      uint8_t note = seq_get_note(i) % 12;
+      float angle = (note * 30 - 90) * PI / 180.0f;
+      int px = cx + (int)(r * cosf(angle));
+      int py = cy + (int)(r * sinf(angle));
+
+      if (last_x != -1) {
+        // Simple line drawing (Bresenham-lite or just points for now to be
+        // safe) Let's just draw 3 points along the line for visual connection
+        for (int step = 0; step <= 3; step++) {
+          int lx = last_x + (px - last_x) * step / 3;
+          int ly = last_y + (py - last_y) * step / 3;
+          set_pixel(lx, ly);
+        }
+      }
+      // Highlight current note position
+      fill_rect(px - 1, py - 1, 3, 3);
+      last_x = px;
+      last_y = py;
+    }
+  }
+}
+
 void ui_show_pattern_tools(int current_option, bool edit_mode,
                            uint32_t euc_steps, uint32_t euc_fills, int euc_rot,
-                           uint8_t euc_probability, int euc_param_idx) {
+                           uint8_t euc_probability, int euc_param_idx,
+                           uint8_t ev_chaos, uint8_t ev_walk, uint8_t ev_octave,
+                           int ev_param_idx) {
   ssd1306_clear_fb();
 
-  // Page Indicators at the bottom - 3 cards now
-  draw_page_indicator(3, current_option);
+  // Page Indicators at the bottom - 4 cards now
+  draw_page_indicator(4, current_option);
 
   if (current_option == 0) { // SCALE CARD
     draw_centered_text(2, "GLOBAL SCALE", 1);
@@ -1186,7 +1226,29 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
         draw_rect_outline(gx + col * 7, gy + row * 7, 5, 5);
     }
 
-  } else if (current_option == 2) { // CLEAR CARD
+  } else if (current_option == 2) { // MELODY EVOLVE CARD
+    draw_centered_text(2, "MELODY EVOLVE", 1);
+
+    char buf[32];
+    sprintf(buf, "CHAOS :%u%%", ev_chaos);
+    draw_scaled_text(4, 15, buf, 1);
+    if (edit_mode && ev_param_idx == 0)
+      invert_region(53, 14, 4 * 7, 10);
+
+    sprintf(buf, "WALK  :%u%%", ev_walk);
+    draw_scaled_text(4, 27, buf, 1);
+    if (edit_mode && ev_param_idx == 1)
+      invert_region(53, 26, 4 * 7, 10);
+
+    sprintf(buf, "OCT   :%u", ev_octave);
+    draw_scaled_text(4, 39, buf, 1);
+    if (edit_mode && ev_param_idx == 2)
+      invert_region(53, 38, 4 * 7, 10);
+
+    // Star Map Visualization
+    draw_star_map(100, 32, 20);
+
+  } else if (current_option == 3) { // CLEAR CARD
     draw_centered_text(2, "RESET PATTERN", 1);
     draw_rect_outline(54, 15, 20, 20);
     draw_scaled_text(60, 18, "!", 2);
