@@ -42,6 +42,11 @@ void seq_set_tie(uint32_t step, bool tie);
 uint8_t seq_get_velocity(uint32_t step);
 void seq_set_velocity(uint32_t step, uint8_t velo_idx);
 
+void seq_queue_euclidean(uint32_t steps, uint32_t fills, int rotation,
+                         uint8_t probability);
+void seq_generate_euclidean(uint32_t steps, uint32_t fills, int rotation,
+                            uint8_t probability);
+
 void seq_save_pattern_ram_only(uint8_t slot);
 void seq_flush_all_patterns_to_eeprom();
 bool seq_has_dirty_patterns();

@@ -577,8 +577,7 @@ int main() {
                 np = 100;
               euc_probability = (uint8_t)np;
             }
-            seq_generate_euclidean(euc_steps, euc_fills, euc_rot,
-                                   euc_probability);
+            seq_queue_euclidean(euc_steps, euc_fills, euc_rot, euc_probability);
           } else if (tools_selection == 2) { // EVOLVE
             if (ev_param_idx == 0) {
               int nc = (int)ev_chaos + encoder_delta * 5;
