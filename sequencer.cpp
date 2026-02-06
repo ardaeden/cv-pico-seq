@@ -408,17 +408,6 @@ void seq_load_pattern(uint8_t slot) {
   state.global_octave = current_oct;
 }
 
-void seq_randomize_gates(uint8_t density_percent) {
-  for (int i = 0; i < 32; i++) {
-    bool on = (rand() % 100) < density_percent;
-    if (on) {
-      state.gate_mask |= (1u << i);
-    } else {
-      state.gate_mask &= ~(1u << i);
-    }
-  }
-}
-
 void seq_reset_pattern() {
   state.gate_mask = 0;
   state.tie_mask = 0;
@@ -594,7 +583,8 @@ void seq_get_note_range(uint8_t &min_note, uint8_t &max_note) {
   }
 }
 
-void seq_generate_euclidean(uint32_t steps, uint32_t fills, int rotation) {
+void seq_generate_euclidean(uint32_t steps, uint32_t fills, int rotation,
+                            uint8_t probability) {
   if (steps == 0)
     return;
   if (steps > 32)
@@ -621,7 +611,10 @@ void seq_generate_euclidean(uint32_t steps, uint32_t fills, int rotation) {
     if (rotated_idx < 0)
       rotated_idx += steps;
     if (pattern[rotated_idx]) {
-      state.gate_mask |= (1UL << i);
+      // Apply probability check
+      if ((rand() % 100) < probability) {
+        state.gate_mask |= (1UL << i);
+      }
     }
   }
 }

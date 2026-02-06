@@ -1117,13 +1117,13 @@ static void draw_page_indicator(int count, int selected) {
   }
 }
 
-void ui_show_pattern_tools(int current_option, bool edit_mode, uint8_t density,
+void ui_show_pattern_tools(int current_option, bool edit_mode,
                            uint32_t euc_steps, uint32_t euc_fills, int euc_rot,
-                           int euc_param_idx) {
+                           uint8_t euc_probability, int euc_param_idx) {
   ssd1306_clear_fb();
 
-  // Page Indicators at the bottom - 4 cards now
-  draw_page_indicator(4, current_option);
+  // Page Indicators at the bottom - 3 cards now
+  draw_page_indicator(3, current_option);
 
   if (current_option == 0) { // SCALE CARD
     draw_centered_text(2, "GLOBAL SCALE", 1);
@@ -1143,30 +1143,7 @@ void ui_show_pattern_tools(int current_option, bool edit_mode, uint8_t density,
       draw_scaled_text(tx, ty, scale_name, font_scale);
     }
 
-  } else if (current_option == 1) { // RANDOM GATES CARD
-    draw_scaled_text(0, 2, "CHAOS GATES", 1);
-    uint32_t mask = seq_get_gate_mask();
-
-    char den_buf[8];
-    sprintf(den_buf, "%%%d", density);
-    int den_tx = 128 - (strlen(den_buf) * 7);
-    draw_scaled_text(den_tx, 2, den_buf, 1);
-    if (edit_mode)
-      invert_region(den_tx - 1, 1, (strlen(den_buf) * 7) + 1, 9);
-
-    // Larger boxes (9x6) and centered grid
-    int gx = 20, gy = 20;
-    for (int i = 0; i < 32; i++) {
-      int row = i / 8;
-      int col = i % 8;
-      if (mask & (1u << i)) {
-        fill_rect(gx + col * 11, gy + row * 8, 9, 6);
-      } else {
-        draw_rect_outline(gx + col * 11, gy + row * 8, 9, 6);
-      }
-    }
-
-  } else if (current_option == 2) { // CLEAR CARD
+  } else if (current_option == 1) { // CLEAR CARD
     draw_centered_text(2, "RESET PATTERN", 1);
     draw_rect_outline(54, 15, 20, 20);
     draw_scaled_text(60, 18, "!", 2);
@@ -1178,7 +1155,7 @@ void ui_show_pattern_tools(int current_option, bool edit_mode, uint8_t density,
       draw_centered_text(45, "DANGER ZONE", 1);
     }
 
-  } else if (current_option == 3) { // EUCLIDEAN CARD
+  } else if (current_option == 2) { // EUCLIDEAN CARD
     draw_centered_text(2, "EUCLIDEAN RHYTHM", 1);
 
     char buf[32];
@@ -1188,17 +1165,22 @@ void ui_show_pattern_tools(int current_option, bool edit_mode, uint8_t density,
       invert_region(53, 14, 3 * 7, 10);
 
     sprintf(buf, "FILLS :%lu", (unsigned long)euc_fills);
-    draw_scaled_text(4, 30, buf, 1);
+    draw_scaled_text(4, 27, buf, 1);
     if (edit_mode && euc_param_idx == 1)
-      invert_region(53, 29, 4 * 7, 10);
+      invert_region(53, 26, 4 * 7, 10);
 
     sprintf(buf, "ROT   :%d", euc_rot);
-    draw_scaled_text(4, 45, buf, 1);
+    draw_scaled_text(4, 39, buf, 1);
     if (edit_mode && euc_param_idx == 2)
-      invert_region(53, 44, 4 * 7, 10);
+      invert_region(53, 38, 4 * 7, 10);
 
-    // Visual preview of Euclidean pattern
-    int gx = 94, gy = 15;
+    sprintf(buf, "PROB  :%d%%", euc_probability);
+    draw_scaled_text(4, 51, buf, 1);
+    if (edit_mode && euc_param_idx == 3)
+      invert_region(53, 50, 4 * 7, 10);
+
+    // Visual preview of Euclidean pattern (Smaller to fit PROB)
+    int gx = 94, gy = 24;
     for (int i = 0; i < 16; i++) {
       int row = i / 4;
       int col = i % 4;
