@@ -43,7 +43,9 @@ void ui_show_settings(int current_option, ClockSource clock_source,
 
 // Show Pattern Tools Selection Menu (Dashboard Cards)
 void ui_show_pattern_tools(int current_option, bool edit_mode = false,
-                           uint8_t density = 50);
+                           uint8_t density = 50, uint32_t euc_steps = 16,
+                           uint32_t euc_fills = 4, int euc_rot = 0,
+                           int euc_param_idx = 0);
 
 // Show a transient message full screen
 void ui_show_message(const char *msg);

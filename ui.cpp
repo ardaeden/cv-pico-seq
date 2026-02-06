@@ -1117,12 +1117,13 @@ static void draw_page_indicator(int count, int selected) {
   }
 }
 
-void ui_show_pattern_tools(int current_option, bool edit_mode,
-                           uint8_t density) {
+void ui_show_pattern_tools(int current_option, bool edit_mode, uint8_t density,
+                           uint32_t euc_steps, uint32_t euc_fills, int euc_rot,
+                           int euc_param_idx) {
   ssd1306_clear_fb();
 
-  // Page Indicators at the bottom - 3 cards now
-  draw_page_indicator(3, current_option);
+  // Page Indicators at the bottom - 4 cards now
+  draw_page_indicator(4, current_option);
 
   if (current_option == 0) { // SCALE CARD
     draw_centered_text(2, "GLOBAL SCALE", 1);
@@ -1175,6 +1176,44 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
       invert_region(0, 44, 128, 10);
     } else {
       draw_centered_text(45, "DANGER ZONE", 1);
+    }
+
+  } else if (current_option == 3) { // EUCLIDEAN CARD
+    draw_centered_text(2, "EUCLIDEAN RHYTHM", 1);
+
+    char buf[32];
+    sprintf(buf, "STEPS :%lu", (unsigned long)euc_steps);
+    draw_scaled_text(4, 15, buf, 1);
+    if (edit_mode && euc_param_idx == 0)
+      invert_region(53, 14, 3 * 7, 10);
+
+    sprintf(buf, "FILLS :%lu", (unsigned long)euc_fills);
+    draw_scaled_text(4, 30, buf, 1);
+    if (edit_mode && euc_param_idx == 1)
+      invert_region(53, 29, 4 * 7, 10);
+
+    sprintf(buf, "ROT   :%d", euc_rot);
+    draw_scaled_text(4, 45, buf, 1);
+    if (edit_mode && euc_param_idx == 2)
+      invert_region(53, 44, 4 * 7, 10);
+
+    // Visual preview of Euclidean pattern
+    int gx = 94, gy = 15;
+    for (int i = 0; i < 16; i++) {
+      int row = i / 4;
+      int col = i % 4;
+      bool bit = false;
+      if (euc_steps > 0) {
+        int rotated_idx = (i + euc_rot) % (int)euc_steps;
+        if (rotated_idx < 0)
+          rotated_idx += euc_steps;
+        if (((rotated_idx * euc_fills) % euc_steps) < euc_fills)
+          bit = true;
+      }
+      if (bit)
+        fill_rect(gx + col * 7, gy + row * 7, 5, 5);
+      else
+        draw_rect_outline(gx + col * 7, gy + row * 7, 5, 5);
     }
   }
 

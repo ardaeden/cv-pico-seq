@@ -593,3 +593,35 @@ void seq_get_note_range(uint8_t &min_note, uint8_t &max_note) {
     max_note = 60;
   }
 }
+
+void seq_generate_euclidean(uint32_t steps, uint32_t fills, int rotation) {
+  if (steps == 0)
+    return;
+  if (steps > 32)
+    steps = 32;
+  if (fills > steps)
+    fills = steps;
+
+  bool pattern[32] = {false};
+  int count = 0;
+
+  // Bresenham-based Euclidean Distribution
+  for (uint32_t i = 0; i < steps; i++) {
+    count += fills;
+    if (count >= (int)steps) {
+      pattern[i] = true;
+      count -= steps;
+    }
+  }
+
+  // Clear current mask and apply rotated pattern
+  state.gate_mask = 0;
+  for (uint32_t i = 0; i < steps; i++) {
+    int rotated_idx = (i + rotation) % (int)steps;
+    if (rotated_idx < 0)
+      rotated_idx += steps;
+    if (pattern[rotated_idx]) {
+      state.gate_mask |= (1UL << i);
+    }
+  }
+}

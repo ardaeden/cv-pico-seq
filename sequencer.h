@@ -62,6 +62,7 @@ void seq_randomize_gates(uint8_t density_percent);
 void seq_reset_pattern();
 int seq_get_num_scales();
 const char *seq_get_scale_name(int scale_idx);
+void seq_generate_euclidean(uint32_t steps, uint32_t fills, int rotation);
 
 void seq_queue_pattern(uint8_t slot);
 int8_t seq_get_pending_pattern();

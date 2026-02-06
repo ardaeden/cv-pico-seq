@@ -46,7 +46,8 @@ int main() {
     SETTINGS,
     PATTERN_TOOLS,
     TOOLS_RANDOM_GATES,
-    TOOLS_CLEAR
+    TOOLS_CLEAR,
+    TOOLS_EUCLIDEAN
   };
   EditMode edit_mode = EDIT_NONE;
   uint32_t edit_step = 0;
@@ -60,6 +61,11 @@ int main() {
   bool tools_edit_mode = false;
   uint8_t temp_density = 50;
   bool clear_confirmed = false;
+
+  uint32_t euc_steps = 16;
+  uint32_t euc_fills = 4;
+  int euc_rot = 0;
+  int euc_param_idx = 0;
 
   bool blink_active = false;
   uint64_t blink_start_time = 0;
@@ -169,15 +175,37 @@ int main() {
         edit_mode = PATTERN_TOOLS;
         tools_selection = 0;
         tools_edit_mode = false;
-        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density);
+        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density,
+                              euc_steps, euc_fills, euc_rot, euc_param_idx);
       }
     } else if (!edit_now && edit_button_down) {
       // Button Released
       if (!edit_long_press_triggered) {
-        // Short Press: Toggle Edit Modes
-        if (edit_mode == EDIT_NONE || edit_mode == PATTERN_SELECT ||
-            edit_mode == SETTINGS || edit_mode == PATTERN_TOOLS ||
-            edit_mode == TOOLS_RANDOM_GATES || edit_mode == TOOLS_CLEAR) {
+        // Short Press: Toggle Edit Modes or BACK navigation
+        if (edit_mode == TOOLS_RANDOM_GATES || edit_mode == TOOLS_CLEAR ||
+            edit_mode == TOOLS_EUCLIDEAN) {
+          // BACK from sub-menu to card selection
+          edit_mode = PATTERN_TOOLS;
+          tools_edit_mode = false;
+          ui_show_pattern_tools(tools_selection, false, temp_density, euc_steps,
+                                euc_fills, euc_rot, euc_param_idx);
+        } else if (edit_mode == PATTERN_TOOLS) {
+          // BACK from card selection to main screen
+          edit_mode = EDIT_NONE;
+          ui_clear();
+          ui_show_bpm(seq_get_bpm(), pattern_slot, clock_get_source(),
+                      current_tstate, false, enc_mode == ENC_BPM_COARSE,
+                      current_tstate == TSTATE_STOP ? 0 : seq_current_step(),
+                      seq_get_steps(),
+                      current_tstate == TSTATE_PAUSE ? !pause_icon_visible
+                                                     : false,
+                      seq_get_global_octave(), enc_mode == ENC_OCTAVE,
+                      seq_get_global_transpose(), enc_mode == ENC_TRANSPOSE);
+          ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
+                                                      : NO_POINTER,
+                        seq_get_steps());
+        } else if (edit_mode == EDIT_NONE || edit_mode == PATTERN_SELECT ||
+                   edit_mode == SETTINGS) {
           edit_mode = EDIT_SELECT_STEP;
           edit_step = 0;
           ui_show_edit_step(edit_step, seq_get_note(edit_step));
@@ -261,13 +289,16 @@ int main() {
                     seq_get_steps(),
                     current_tstate == TSTATE_PAUSE ? !pause_icon_visible
                                                    : false,
-                    seq_get_global_octave(), enc_mode == ENC_OCTAVE, seq_get_global_transpose(), enc_mode == ENC_TRANSPOSE);
+                    seq_get_global_octave(), enc_mode == ENC_OCTAVE,
+                    seq_get_global_transpose(), enc_mode == ENC_TRANSPOSE);
         ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                     : 0xFFFFFFFF,
                       seq_get_steps());
-      } else if (edit_mode == TOOLS_RANDOM_GATES || edit_mode == TOOLS_CLEAR) {
+      } else if (edit_mode == TOOLS_RANDOM_GATES || edit_mode == TOOLS_CLEAR ||
+                 edit_mode == TOOLS_EUCLIDEAN) {
         edit_mode = PATTERN_TOOLS;
-        ui_show_pattern_tools(tools_selection);
+        ui_show_pattern_tools(tools_selection, false, temp_density, euc_steps,
+                              euc_fills, euc_rot, euc_param_idx);
       } else {
         edit_mode = SETTINGS;
         settings_option = 0;
@@ -307,7 +338,8 @@ int main() {
                     seq_get_steps(),
                     current_tstate == TSTATE_PAUSE ? !pause_icon_visible
                                                    : false,
-                    seq_get_global_octave(), enc_mode == ENC_OCTAVE, seq_get_global_transpose(), enc_mode == ENC_TRANSPOSE);
+                    seq_get_global_octave(), enc_mode == ENC_OCTAVE,
+                    seq_get_global_transpose(), enc_mode == ENC_TRANSPOSE);
         ui_show_steps(current_tstate != TSTATE_STOP ? seq_current_step()
                                                     : 0xFFFFFFFF,
                       seq_get_steps());
@@ -327,10 +359,18 @@ int main() {
                          clock_get_gate_length(), clock_get_ppqn(),
                          seq_get_load_mode(), settings_edit_mode);
       } else if (edit_mode == PATTERN_TOOLS) {
-        if (tools_selection == 1) { // Chaos Gates Card
+        if (tools_selection == 0) { // Scale Card
           tools_edit_mode = !tools_edit_mode;
+        } else if (tools_selection == 1) { // Chaos Gates Card
+          if (!tools_edit_mode) {
+            edit_mode = TOOLS_RANDOM_GATES;
+            tools_edit_mode = true;
+          } else {
+            tools_edit_mode = false;
+          }
         } else if (tools_selection == 2) { // CLEAR Card
           if (!tools_edit_mode) {
+            edit_mode = TOOLS_CLEAR;
             tools_edit_mode = true;
             clear_confirmed = false;
           } else {
@@ -347,11 +387,60 @@ int main() {
             ui_clear();
             ui_show_edit_step(edit_step, seq_get_note(edit_step));
           }
-        } else {
-          tools_edit_mode = !tools_edit_mode;
+        } else if (tools_selection == 3) { // Euclidean Card
+          if (!tools_edit_mode) {
+            edit_mode = TOOLS_EUCLIDEAN;
+            tools_edit_mode = true;
+            euc_param_idx = 0;
+          }
         }
-        if (edit_mode == PATTERN_TOOLS) {
-          ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density);
+        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density,
+                              euc_steps, euc_fills, euc_rot, euc_param_idx);
+      } else if (edit_mode == TOOLS_EUCLIDEAN) {
+        // Cycle parameters in Euclidean mode
+        euc_param_idx = (euc_param_idx + 1) % 3;
+        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density,
+                              euc_steps, euc_fills, euc_rot, euc_param_idx);
+      } else if (edit_mode == TOOLS_RANDOM_GATES || edit_mode == TOOLS_CLEAR) {
+        // Encoder button acts as toggle/exit for other tools?
+        // For now, let's keep random gates toggle logic if needed,
+        // or just let Pattern Edit be the only back button.
+        // User implied they want Pattern Edit to be BACK.
+        // If Encoder Button was exiting, let's remove that behavior if
+        // unwanted, or keep it if it toggles selection. Current logic in Step
+        // 901 forced exit to PATTERN_TOOLS. Let's remove the forced exit on
+        // Encoder Button for these modes allows sticking in the mode. EXCEPT
+        // for Clear, where second press executes clear.
+
+        // Wait, Clear logic is handled inside PATTERN_TOOLS block above (lines
+        // 371-389). Once in TOOLS_CLEAR, pressing encoder button again... The
+        // block at 371 only runs if edit_mode == PATTERN_TOOLS. So we need to
+        // handle "EXECUTE CLEAR" here if in TOOLS_CLEAR.
+
+        if (edit_mode == TOOLS_CLEAR) {
+          seq_reset_pattern();
+          ui_show_message("CLEARED!");
+          sleep_ms(600);
+          clear_confirmed = true;
+          tools_edit_mode = false;
+          edit_mode = EDIT_SELECT_STEP;
+          edit_step = 0;
+          ui_clear();
+          ui_show_edit_step(edit_step, seq_get_note(edit_step));
+        } else if (edit_mode == TOOLS_RANDOM_GATES) {
+          // Maybe toggle something? or just do nothing (let Edit Button be
+          // back) Previously it exited. Let's make it do nothing to force Edit
+          // Button usage? Or let it toggle tools_edit_mode? If we toggle
+          // tools_edit_mode, we are essentially going back to selection state
+          // conceptually but edit_mode variable needs to change to
+          // PATTERN_TOOLS. Let's keep "Encoder Button = Back" for Random Gates
+          // for consistency with toggle behavior? User explicitly complained
+          // about "Back" button behavior of Pattern Edit. Let's remove Encoder
+          // Button exiting for Random Gates so they MUST use Pattern Edit. But
+          // wait, Random gates doesn't have parameters to cycle. Let's leave it
+          // empty for now, or just redraw.
+          ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density,
+                                euc_steps, euc_fills, euc_rot, euc_param_idx);
         }
       } else if (edit_mode == EDIT_NONE) {
         if (enc_mode == ENC_BPM_FINE)
@@ -369,7 +458,8 @@ int main() {
                     seq_get_steps(),
                     current_tstate == TSTATE_PAUSE ? !pause_icon_visible
                                                    : false,
-                    seq_get_global_octave(), enc_mode == ENC_OCTAVE, seq_get_global_transpose(), enc_mode == ENC_TRANSPOSE);
+                    seq_get_global_octave(), enc_mode == ENC_OCTAVE,
+                    seq_get_global_transpose(), enc_mode == ENC_TRANSPOSE);
       }
     }
 
@@ -447,7 +537,9 @@ int main() {
         ui_show_settings(settings_option, clock_get_source(),
                          clock_get_gate_length(), clock_get_ppqn(),
                          seq_get_load_mode(), settings_edit_mode);
-      } else if (edit_mode == PATTERN_TOOLS) {
+      } else if (edit_mode == PATTERN_TOOLS ||
+                 edit_mode == TOOLS_RANDOM_GATES || edit_mode == TOOLS_CLEAR ||
+                 edit_mode == TOOLS_EUCLIDEAN) {
         if (tools_edit_mode) {
           if (tools_selection == 0) { // Scale
             int gs = seq_get_global_scale() + encoder_delta;
@@ -465,15 +557,39 @@ int main() {
               d = 100;
             temp_density = (uint8_t)d;
             seq_randomize_gates(temp_density);
+          } else if (tools_selection == 3) { // Euclidean
+            if (euc_param_idx == 0) {
+              int ns = (int)euc_steps + encoder_delta;
+              if (ns < 1)
+                ns = 32;
+              if (ns > 32)
+                ns = 1;
+              euc_steps = (uint32_t)ns;
+            } else if (euc_param_idx == 1) {
+              int nf = (int)euc_fills + encoder_delta;
+              if (nf < 0)
+                nf = euc_steps;
+              if (nf > (int)euc_steps)
+                nf = 0;
+              euc_fills = (uint32_t)nf;
+            } else if (euc_param_idx == 2) {
+              euc_rot += encoder_delta;
+              if (euc_rot < 0)
+                euc_rot = euc_steps - 1;
+              if (euc_rot >= (int)euc_steps)
+                euc_rot = 0;
+            }
+            seq_generate_euclidean(euc_steps, euc_fills, euc_rot);
           }
         } else {
           tools_selection += encoder_delta;
           if (tools_selection < 0)
-            tools_selection = 2; // 3 options: 0, 1, 2
-          if (tools_selection > 2)
+            tools_selection = 3; // 4 options: 0, 1, 2, 3
+          if (tools_selection > 3)
             tools_selection = 0;
         }
-        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density);
+        ui_show_pattern_tools(tools_selection, tools_edit_mode, temp_density,
+                              euc_steps, euc_fills, euc_rot, euc_param_idx);
       } else if (edit_mode == EDIT_NONE) {
         if (io_is_step_button_pressed()) {
           int ns = (int)seq_get_steps() + encoder_delta;
