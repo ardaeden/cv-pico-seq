@@ -440,23 +440,23 @@ void ui_show_bpm(uint32_t bpm, uint8_t pattern_slot, ClockSource clock_source,
   }
 
   // Draw Octave (Fixed Position)
-  ui_draw_text(40, 0, "O:");
+  ui_draw_text(34, 0, "Oct:");
   char oct_buf[8];
   snprintf(oct_buf, sizeof(oct_buf), "%+d", global_octave);
   if (octave_inverted) {
-    ui_draw_text_inverted(52, 0, oct_buf);
+    ui_draw_text_inverted(58, 0, oct_buf);
   } else {
-    ui_draw_text(52, 0, oct_buf);
+    ui_draw_text(58, 0, oct_buf);
   }
 
   // Draw Transpose (Fixed Position)
-  ui_draw_text(72, 0, "T:");
+  ui_draw_text(74, 0, "Tr:");
   char tr_buf[8];
   snprintf(tr_buf, sizeof(tr_buf), "%+02d", global_transpose);
   if (transpose_inverted) {
-    ui_draw_text_inverted(84, 0, tr_buf);
+    ui_draw_text_inverted(92, 0, tr_buf);
   } else {
-    ui_draw_text(84, 0, tr_buf);
+    ui_draw_text(92, 0, tr_buf);
   }
 
   // Draw pattern slot (right aligned)
