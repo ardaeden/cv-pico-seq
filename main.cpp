@@ -360,7 +360,13 @@ int main() {
       } else if (edit_mode == PATTERN_TOOLS) {
         if (tools_selection == 0) { // Scale Card
           tools_edit_mode = !tools_edit_mode;
-        } else if (tools_selection == 1) { // CLEAR Card
+        } else if (tools_selection == 1) { // Euclidean Card
+          if (!tools_edit_mode) {
+            edit_mode = TOOLS_EUCLIDEAN;
+            tools_edit_mode = true;
+            euc_param_idx = 0;
+          }
+        } else if (tools_selection == 2) { // CLEAR Card
           if (!tools_edit_mode) {
             edit_mode = TOOLS_CLEAR;
             tools_edit_mode = true;
@@ -378,12 +384,6 @@ int main() {
             edit_step = 0;
             ui_clear();
             ui_show_edit_step(edit_step, seq_get_note(edit_step));
-          }
-        } else if (tools_selection == 2) { // Euclidean Card
-          if (!tools_edit_mode) {
-            edit_mode = TOOLS_EUCLIDEAN;
-            tools_edit_mode = true;
-            euc_param_idx = 0;
           }
         }
         ui_show_pattern_tools(tools_selection, tools_edit_mode, euc_steps,
@@ -528,7 +528,7 @@ int main() {
             if (gs >= ns)
               gs = 0;
             seq_set_global_scale(gs);
-          } else if (tools_selection == 2) { // Euclidean
+          } else if (tools_selection == 1) { // Euclidean
             if (euc_param_idx == 0) {
               int ns = (int)euc_steps + encoder_delta;
               if (ns < 1)
@@ -559,6 +559,8 @@ int main() {
             }
             seq_generate_euclidean(euc_steps, euc_fills, euc_rot,
                                    euc_probability);
+          } else if (tools_selection == 2) { // CLEAR (no encoder action)
+            // No encoder action for CLEAR in edit mode
           }
         } else {
           tools_selection += encoder_delta;

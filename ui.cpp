@@ -1143,19 +1143,7 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
       draw_scaled_text(tx, ty, scale_name, font_scale);
     }
 
-  } else if (current_option == 1) { // CLEAR CARD
-    draw_centered_text(2, "RESET PATTERN", 1);
-    draw_rect_outline(54, 15, 20, 20);
-    draw_scaled_text(60, 18, "!", 2);
-
-    if (edit_mode) {
-      draw_centered_text(45, "CONFIRM CLEAR?", 1);
-      invert_region(0, 44, 128, 10);
-    } else {
-      draw_centered_text(45, "DANGER ZONE", 1);
-    }
-
-  } else if (current_option == 2) { // EUCLIDEAN CARD
+  } else if (current_option == 1) { // EUCLIDEAN CARD
     draw_centered_text(2, "EUCLIDEAN RHYTHM", 1);
 
     char buf[32];
@@ -1196,6 +1184,18 @@ void ui_show_pattern_tools(int current_option, bool edit_mode,
         fill_rect(gx + col * 7, gy + row * 7, 5, 5);
       else
         draw_rect_outline(gx + col * 7, gy + row * 7, 5, 5);
+    }
+
+  } else if (current_option == 2) { // CLEAR CARD
+    draw_centered_text(2, "RESET PATTERN", 1);
+    draw_rect_outline(54, 15, 20, 20);
+    draw_scaled_text(60, 18, "!", 2);
+
+    if (edit_mode) {
+      draw_centered_text(45, "CONFIRM CLEAR?", 1);
+      invert_region(0, 44, 128, 10);
+    } else {
+      draw_centered_text(45, "DANGER ZONE", 1);
     }
   }
 
